@@ -1,0 +1,19 @@
+mod std::c;
+
+#[extern]
+func malloc(size: u64) *void
+
+#[extern]
+func free(ptr: *void) void
+
+#[extern]
+pub func memcpy(dst: mut *void, src: *void, size: u64) *void
+
+#[extern]
+pub func memmove(dst: mut *void, src: *void, size: u64) *void
+
+#[extern]
+pub func memset(dst: mut *void, ch: i32, size: u64) *void
+
+#[extern]
+pub func memcmp(lhs: *void, rhs: *void, size: u64) i32

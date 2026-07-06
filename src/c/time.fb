@@ -1,0 +1,9 @@
+mod std::c;
+
+pub struct Timespec {
+    pub seconds: i64,
+    pub nanoseconds: i64,
+}
+
+#[extern]
+pub func timespec_get(ts: mut *Timespec, base: i32) i32
