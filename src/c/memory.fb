@@ -1,10 +1,10 @@
 mod std::c;
 
 #[extern]
-func malloc(size: u64) *void
+pub func malloc(size: u64) *void
 
 #[extern]
-func free(ptr: *void) void
+pub func free(ptr: *void) void
 
 #[extern]
 pub func memcpy(dst: mut *void, src: *void, size: u64) *void
