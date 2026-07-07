@@ -1,2 +1,4 @@
 name = "std"
+type = "library"
+
 lib-c = true
