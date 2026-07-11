@@ -1,0 +1,61 @@
+mod std::net::unix;
+
+pub enum Domain : i32 {
+    IP4 = 2,
+    IP6 = 10,
+}
+
+pub enum Type : i32 {
+    TCP = 1,
+    UDP = 2,
+}
+
+pub enum Protocol : i32 {
+    IP = 0,
+}
+
+pub struct SocketAddress {
+    pub domain: u16,
+    port: u16,
+    pub ip: [4]u8,
+
+    _pad: [8]u8,
+}
+
+impl SocketAddress {
+    pub func new(domain: Domain, ip: [4]u8, port: u16) Self {
+        return Self {
+            domain: domain as u16,
+            port: ((port >> 8u) & 0xFF) | ((port & 0xFF) << 8u),
+            ip: ip,
+        };
+    }
+
+    pub func port(self) u16 {
+        return ((self.port >> 8u) & 0xFF) | ((self.port & 0xFF) << 8u);
+    }
+}
+
+#[extern]
+pub func socket(domain: Domain, type_: Type, protocol: Protocol) i32
+
+#[extern]
+pub func bind(fd: i32, addr: *SocketAddress, len: u32) i32
+
+#[extern]
+pub func connect(fd: i32, addr: *SocketAddress, len: u32) i32
+
+#[extern]
+pub func listen(fd: i32, backlog: i32) i32
+
+#[extern]
+pub func accept(fd: i32, addr: mut* SocketAddress, len: mut* u32) i32
+
+#[extern]
+pub func send(fd: i32, buf: *void, len: u64, flags: i32) i64
+
+#[extern]
+pub func recv(fd: i32, buf: mut* void, len: u64, flags: i32) i64
+
+#[extern]
+pub func close(fd: i32) i32
