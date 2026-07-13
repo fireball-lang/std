@@ -1,0 +1,12 @@
+mod std::c;
+
+import std::c::{malloc, memcpy};
+
+pub func to_cstring(str: StringView) mut* u8 {
+    var cstr = malloc(str.size + 1u) as mut* u8;
+
+    memcpy(cstr, str.ptr, str.size);
+    cstr[str.size] = 0u;
+
+    return cstr;
+}

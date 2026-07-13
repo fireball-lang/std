@@ -1,0 +1,20 @@
+mod std::net::unix;
+
+import std::net::unix::{SocketAddress};
+
+pub struct DnsEntry {
+    pub flags: i32,
+    pub family: i32,
+    pub socktype: i32,
+    pub protocol: i32,
+    pub addrlen: u32,
+    pub addr: *SocketAddress,
+    pub canonname: *u8,
+    pub next: *DnsEntry,
+}
+
+#[extern]
+pub func getaddrinfo(name: *u8, service: *u8, hints: *DnsEntry, result: mut** DnsEntry) i32
+
+#[extern]
+pub func freeaddrinfo(result: *DnsEntry) void

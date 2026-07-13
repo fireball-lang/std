@@ -1,0 +1,64 @@
+mod std::net;
+
+pub struct Uri {
+    pub scheme: StringView,
+    pub authority: StringView,
+    pub path: StringView,
+    pub query: StringView,
+    pub fragment: StringView,
+}
+
+impl Uri {
+    pub func parse(str: StringView) Uri {
+        var result: Uri;
+        var remaining = str;
+
+        // 1. Extract the fragment (everything after the first '#')
+        var hash_idx = remaining.index("#");
+        if (hash_idx != -1) {
+            var idx = (hash_idx as u32);
+            result.fragment = remaining.slice(idx + 1u, remaining.size);
+            remaining = remaining.slice(0u, idx);
+        }
+
+        // 2. Extract the query (everything after the first '?' in the remaining part)
+        var query_idx = remaining.index("?");
+        if (query_idx != -1) {
+            var idx = (query_idx as u32);
+            result.query = remaining.slice(idx + 1u, remaining.size);
+            remaining = remaining.slice(0u, idx);
+        }
+
+        // 3. Extract the scheme (must be before the first '/' if it exists)
+        var colon_idx = remaining.index(":");
+        var slash_idx = remaining.index("/");
+
+        if (colon_idx != -1 && (slash_idx == -1 || colon_idx < slash_idx)) {
+            var idx = (colon_idx as u32);
+            result.scheme = remaining.slice(0u, idx);
+            remaining = remaining.slice(idx + 1u, remaining.size);
+        }
+
+        // 4. Extract the authority (if it starts with "//")
+        if (remaining.starts_with("//")) {
+            remaining = remaining.slice(2u, remaining.size);
+
+            var auth_slash_idx = remaining.index("/");
+            if (auth_slash_idx != -1) {
+                var idx = (auth_slash_idx as u32);
+                result.authority = remaining.slice(0u, idx);
+                // Keep the '/' for the path
+                remaining = remaining.slice(idx, remaining.size);
+            } else {
+                // No trailing slash, everything left is authority
+                result.authority = remaining;
+                remaining = remaining.slice(remaining.size, remaining.size); // Empty the remaining view
+            }
+        }
+
+        // 5. The remaining part is strictly the path
+        result.path = remaining;
+
+        return result;
+    }
+}
