@@ -1,0 +1,80 @@
+mod std;
+
+import std::{ArrayList};
+
+pub struct Item[K, V] {
+    pub key: K,
+    pub value: V,
+}
+
+pub struct ArrayMap[K: Eq, V] {
+    items: ArrayList[Item[K, V]],
+}
+
+impl[K: Eq, V] ArrayMap[K, V] {
+    pub func insert(mut self, key: K, value: V) {
+        for (var i = 0u; i < self.items.size(); i++) {
+            var item = self.items.get_ptr(i);
+
+            if (item.key.eq(key)) {
+                item.value = value;
+                return;
+            }
+        }
+
+        self.items.add(Item::[K, V] {
+            key: key,
+            value: value,
+        });
+    }
+
+    pub func try_get(self, key: K, value: mut* V) bool {
+        for (var i = 0u; i < self.items.size(); i++) {
+            var item = self.items.get_ptr(i);
+
+            if (item.key.eq(key)) {
+                *value = item.value;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    pub func contains(self, key: K) bool {
+        for (var i = 0u; i < self.items.size(); i++) {
+            if (self.items.get(i).key.eq(key)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    pub func remove(mut self, key: K) V {
+        for (var i = 0u; i < self.items.size(); i++) {
+            var item = self.items.get_ptr(i);
+
+            if (item.key.eq(key)) {
+                var value = item.value;
+                self.items.remove(i);
+                return value;
+            }
+        }
+
+        var empty: V;
+        return empty;
+    }
+
+    pub func size(self) u32 {
+        return self.items.size();
+    }
+
+    pub func get_at(self, index: u32) Item[K, V] {
+        return self.items.get(index);
+    }
+
+    pub func free(mut self) {
+        self.items.free();
+    }
+}
