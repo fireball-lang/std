@@ -1,0 +1,107 @@
+mod std::net::http;
+
+import std::{ArrayList};
+
+pub struct Header {
+    pub key: StringView,
+    pub value: StringView,
+}
+
+impl Header {
+    pub func key_eq(self, key: StringView) bool {
+        return case_insensitive_eq(self.key, key);
+    }
+}
+
+pub struct HeaderMap {
+    headers: ArrayList[Header],
+}
+
+impl HeaderMap {
+    pub func insert(mut self, key: StringView, value: StringView) {
+        for (var i = 0u; i < self.headers.size(); i++) {
+            var item = self.headers.get_ptr(i);
+
+            if (case_insensitive_eq(item.key, key)) {
+                item.value = value;
+                return;
+            }
+        }
+
+        self.headers.add(Header {
+            key: key,
+            value: value,
+        });
+    }
+
+    pub func try_get(self, key: StringView, value: mut* StringView) bool {
+        for (var i = 0u; i < self.headers.size(); i++) {
+            var item = self.headers.get_ptr(i);
+
+            if (case_insensitive_eq(item.key, key)) {
+                *value = item.value;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    pub func get(self, key: StringView) StringView {
+        var value: StringView;
+        var ok = self.try_get(key, &value);
+
+        return value;
+    }
+
+    pub func contains(self, key: StringView) bool {
+        for (var i = 0u; i < self.headers.size(); i++) {
+            if (case_insensitive_eq(self.headers.get(i).key, key)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    pub func remove(mut self, key: StringView) StringView {
+        for (var i = 0u; i < self.headers.size(); i++) {
+            var item = self.headers.get_ptr(i);
+
+            if (case_insensitive_eq(item.key, key)) {
+                var value = item.value;
+                self.headers.remove(i);
+                return value;
+            }
+        }
+
+        return "";
+    }
+
+    pub func size(self) u32 {
+        return self.headers.size();
+    }
+
+    pub func get_at(self, index: u32) Header {
+        return self.headers.get(index);
+    }
+
+    pub func free(mut self) {
+        self.headers.free();
+    }
+}
+
+func case_insensitive_eq(a: StringView, b: StringView) bool {
+    if (a.size != b.size) return false;
+
+    for (var i = 0u; i < a.size; i++) {
+        if (to_lower(a.ptr[i]) != to_lower(b.ptr[i])) return false;
+    }
+
+    return true;
+}
+
+func to_lower(ch: u8) u8 {
+    if (ch >= 'A' && ch <= 'Z') return (ch - 'A' + 'a') as u8;
+    return ch;
+}

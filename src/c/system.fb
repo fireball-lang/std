@@ -1,0 +1,4 @@
+mod std::c;
+
+#[extern]
+pub func exit(code: i32) void

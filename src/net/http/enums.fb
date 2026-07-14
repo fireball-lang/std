@@ -1,0 +1,192 @@
+mod std::net::http;
+
+pub enum Method {
+    GET,
+    HEAD,
+    OPTIONS,
+    TRACE,
+    DELETE,
+    PUT,
+    POST,
+    PATCH,
+    CONNECT,
+    QUERY,
+    PRI,
+}
+
+impl Method {
+    pub func string(self) StringView {
+        if (*self == Method::GET) return "GET";
+        if (*self == Method::HEAD) return "HEAD";
+        if (*self == Method::OPTIONS) return "OPTIONS";
+        if (*self == Method::TRACE) return "TRACE";
+        if (*self == Method::DELETE) return "DELETE";
+        if (*self == Method::PUT) return "PUT";
+        if (*self == Method::POST) return "POST";
+        if (*self == Method::PATCH) return "PATCH";
+        if (*self == Method::CONNECT) return "CONNECT";
+        if (*self == Method::QUERY) return "QUERY";
+        if (*self == Method::PRI) return "PRI";
+
+        return "";
+    }
+}
+
+pub enum Status {
+    // 1xx - Informational
+    Continue = 100,
+    SwitchingProtocols = 101,
+    Processing = 102,
+    EarlyHints = 103,
+
+    // 2xx - Success
+    Ok = 200,
+    Created = 201,
+    Accepted = 202,
+    NonAuthoritativeInformation = 203,
+    NoContent = 204,
+    ResetContent = 205,
+    PartialContent = 206,
+    MultiStatus = 207,
+    AlreadyReported = 208,
+    ThisIsFine = 218,
+    ImUsed = 226,
+
+    // 3xx - Redirection
+    MultipleChoices = 300,
+    MovedPermanently = 301,
+    Found = 302,
+    SeeOther = 303,
+    NotModified = 304,
+    UseProxy = 305,
+    SwitchProxy = 306,
+    TemporaryRedirect = 307,
+    PermanentRedirect = 308,
+
+    // 4xx - Client error
+    BadRequest = 400,
+    Unauthorized = 401,
+    PaymentRequired = 402,
+    Forbidden = 403,
+    NotFound = 404,
+    MethodNotAllowed = 405,
+    NotAcceptable = 406,
+    ProxyAuthenticationRequired = 407,
+    RequestTimeout = 408,
+    Conflict = 409,
+    Gone = 410,
+    LengthRequired = 411,
+    PreconditionFailed = 412,
+    ContentTooLarge = 413,
+    UriTooLong = 414,
+    UnsupportedMediaType = 415,
+    RangeNotSatisfiable = 416,
+    ExpectationFailed = 417,
+    ImATeapot = 418,
+    PageExpired = 419,
+    MethodFailureOrEnhanceYourCalm = 420,
+    MisdirectedRequest = 421,
+    UnprocessableContent = 422,
+    Locked = 423,
+    FailedDependency = 424,
+    TooEarly = 425,
+    UpgradeRequired = 426,
+    PreconditionRequired = 428,
+    TooManyRequests = 429,
+    SecurityRejection = 430,
+    RequestHeaderFieldsTooLarge = 431,
+    LoginTimeOut = 440,
+    NoResponse = 444,
+    RetryWith = 449,
+    BlockedByWindowsParentalControl = 450,
+    UnavailableForLegalReasons = 451,
+    ClientClosedConnectionPrematurely = 460,
+    TooManyForwardedIpAddresses = 463,
+    IncompatibleProtocol = 464,
+    RequestDenied = 470,
+    UserAccessForbidden = 492,
+    UnsupportedBrowser = 493,
+    RequestHeaderTooLarge = 494,
+    SslCertificateError = 495,
+    SslCertificateRequired = 496,
+    HttpRequestSentToHttpsPort = 497,
+    InvalidToken = 498,
+    TokenRequiredOrClientClosedRequest = 499,
+
+    // 5xx - Server error
+    InternalServerError = 500,
+    NotImplemented = 501,
+    BadGateway = 502,
+    ServiceUnavailable = 503,
+    GatewayTimeout = 504,
+    HttpVersionNotSupported = 505,
+    VariantAlsoNegotiates = 506,
+    InsufficientStorage = 507,
+    LoopDetected = 508,
+    BandwidthLimitExceeded = 509,
+    NotExtended = 510,
+    NetworkAuthenticationRequired = 511,
+    WebServerIsReturningAnUnknownError = 520,
+    WebServerIsDown = 521,
+    ConnectionTimedOut = 522,
+    OriginIsUnreachable = 523,
+    TimeoutOccurred = 524,
+    SslHandshakeFailed = 525,
+    InvalidSslCertificate = 526,
+    RailgunListenerToOrigin = 527,
+    ServiceIsOverloaded = 529,
+    SiteFrozen = 530,
+    UpstreamConnectionError = 531,
+    ResponseTooLarge = 532,
+    UpstreamTlsError = 533,
+    ApplicationError = 534,
+    UnknownApplication = 535,
+    HttpResponseTimeout = 536,
+    DnsResolutionError = 537,
+    RequestLoop = 538,
+    ServerlessTimeout = 539,
+    TemporarilyDisabled = 540,
+    OutOfWorkers = 541,
+    DatabaseErrorOrHeaderOverflow = 542,
+    CommunicationErrorOrUpstreamTimeout = 543,
+    ManagementErrorOrInvalidHostHeader = 544,
+    AuthenticationErrorOrComponentNotReady = 545,
+    UnknownApplicationOrTlsError = 546,
+    NoHttpResponse = 547,
+    InvalidResponseOrDnsResolutionError = 548,
+    AuthenticationGatewayErrorOrApplicationCrash = 549,
+    ApplicationUnreachable = 552,
+    DirectoryServiceError = 553,
+    AuthenticationTokenError = 554,
+    ApplicationDoesNotSupportKerberos = 555,
+    UnexpectedAuthenticationChallenge = 556,
+    KdcUnreachable = 557,
+    ConnectionLimitStop1 = 558,
+    ConnectionLimitStop2 = 559,
+    UnauthorizedServer = 561,
+    CredentialError = 562,
+    NetworkReadTimeoutError = 598,
+    NetworkConnectTimeoutError = 599,
+}
+
+impl Status {
+    pub func is_informational(self) bool {
+        return *self as u16 >= 100u && *self as u16 <= 199u;
+    }
+
+    pub func is_success(self) bool {
+        return *self as u16 >= 200u && *self as u16 <= 299u;
+    }
+
+    pub func is_redirection(self) bool {
+        return *self as u16 >= 300u && *self as u16 <= 399u;
+    }
+
+    pub func is_client_error(self) bool {
+        return *self as u16 >= 400u && *self as u16 <= 499u;
+    }
+
+    pub func is_server_error(self) bool {
+        return *self as u16 >= 500u && *self as u16 <= 599u;
+    }
+}

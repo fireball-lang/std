@@ -1,0 +1,156 @@
+mod std::net::http;
+
+import std::net::http::{Method, Status, HeaderMap, Response};
+import std::net::{Socket, Uri, resolve_domain};
+
+pub struct Request {
+    pub method: Method,
+    pub uri: Uri,
+    pub headers: HeaderMap,
+
+    pub body_data: *void,
+    pub body_size: u32,
+}
+
+impl Request {
+    pub func get(url: StringView) Self {
+        return Self {
+            method: Method::GET,
+            uri: Uri::parse(url),
+        };
+    }
+
+    pub func delete(url: StringView) Self {
+        return Self {
+            method: Method::DELETE,
+            uri: Uri::parse(url),
+        };
+    }
+
+    pub func put(url: StringView, data: *void, size: u32) Self {
+        return Self {
+            method: Method::PUT,
+            uri: Uri::parse(url),
+            body_data: data,
+            body_size: size,
+        };
+    }
+
+    pub func post(url: StringView, data: *void, size: u32) Self {
+        return Self {
+            method: Method::POST,
+            uri: Uri::parse(url),
+            body_data: data,
+            body_size: size,
+        };
+    }
+
+    pub func send(mut self) Response {
+        // Connect to server
+        var ips: [4][4]u8;
+        var size = resolve_domain(self.uri.authority, &ips[0], 4u);
+
+        var socket: Socket;
+
+        for (var i = 0u; i < size && !socket.is_open(); i++) {
+            socket = Socket::connect(ips[i], 80u);
+        }
+
+        if (!socket.is_open()) {
+            var empty: Response;
+            return empty;
+        }
+
+        // Send request line
+        self.send_line(socket);
+
+        // Send headers
+        self.send_header(socket, "Host", self.uri.authority);
+
+        var has_user_agent = false;
+        var has_accept = false;
+
+        for (var i = 0u; i < self.headers.size(); i++) {
+            var header = self.headers.get_at(i);
+
+            if (!header.key_eq("Host") && !header.key_eq("Content-Length")) {
+                self.send_header(socket, header.key, header.value);
+
+                if (header.key_eq("User-Agent")) has_user_agent = true;
+                else if (header.key_eq("Accept")) has_accept = true;
+            }
+        }
+
+        if (!has_user_agent) self.send_header(socket, "User-Agent", "fireball-std");
+        if (!has_accept) self.send_header(socket, "Accept", "*/*");
+
+        socket.send_str("Content-Length: ");
+        send_u32(socket, self.body_size);
+        socket.send_str("\r\n");
+
+        socket.send_str("\r\n");
+
+        // Send body
+        socket.send(self.body_data, self.body_size);
+
+        // Receive resposne
+        return Response::receive_from(socket);
+    }
+
+    func send_line(mut self, socket: Socket) {
+        socket.send_str(self.method.string());
+        socket.send_str(" ");
+
+        if (self.uri.path.size > 0u) {
+            socket.send_str(self.uri.path);
+        } else {
+            socket.send_str("/");
+        }
+
+        if (self.uri.query.size > 0u) {
+            socket.send_str("?");
+            socket.send_str(self.uri.query);
+        }
+
+        if (self.uri.fragment.size > 0u) {
+            socket.send_str("#");
+            socket.send_str(self.uri.fragment);
+        }
+
+        socket.send_str(" HTTP/1.0\r\n");
+    }
+
+    func send_header(mut self, socket: Socket, key: StringView, value: StringView) {
+        socket.send_str(key);
+        socket.send_str(": ");
+        socket.send_str(value);
+        socket.send_str("\r\n");
+    }
+
+    pub func close(mut self) {
+        self.headers.free();
+    }
+}
+
+func send_u32(socket: Socket, num: u32) {
+    var buffer: [16]u8;
+    var len = 0u;
+
+    for (;;) {
+        buffer[len++] = ('0' + num % 10u) as u8;
+        num /= 10u;
+
+        if (num == 0u) break;
+    }
+
+    for (var i = 0u; i < len / 2u; i++) {
+        var temp = buffer[i];
+        buffer[i] = buffer[len - i - 1u];
+        buffer[len - i - 1u] = temp;
+    }
+
+    socket.send_str(StringView {
+        ptr: &buffer[0],
+        size: len,
+    });
+}

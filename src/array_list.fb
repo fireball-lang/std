@@ -10,14 +10,18 @@ pub struct ArrayList[T] {
 
 impl[T] ArrayList[T] {
     pub func ensure_capacity(mut self, additional_size: u32) {
-        if (self.size + additional_size < self.capacity) return;
+        if (self.size + additional_size <= self.capacity) return;
 
         var new_capacity = self.capacity * 2u;
         if (new_capacity == 0u) new_capacity = 8u;
+        if (new_capacity < self.size + additional_size) new_capacity = self.size + additional_size;
 
         var new_ptr = malloc(new_capacity * sizeof(T)) as mut* T;
-        memcpy(new_ptr, self.ptr, self.size * sizeof(T));
-        free(self.ptr);
+
+        if (self.ptr != null) {
+            memcpy(new_ptr, self.ptr, self.size * sizeof(T));
+            free(self.ptr);
+        }
 
         self.ptr = new_ptr;
         self.capacity = new_capacity;

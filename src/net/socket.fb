@@ -6,6 +6,7 @@ pub struct Socket {
     pub ip: [4]u8,
     pub port: u16,
 
+    open: bool,
     fd: i32,
 }
 
@@ -20,6 +21,7 @@ impl Socket {
             ip: ip,
             port: port,
             fd: fd,
+            open: fd >= 0,
         };
     }
 
@@ -34,7 +36,12 @@ impl Socket {
             ip: ip,
             port: port,
             fd: fd,
+            open: fd >= 0,
         };
+    }
+
+    pub func is_open(self) bool {
+        return self.open;
     }
 
     pub func accept(self) Self {
@@ -47,18 +54,24 @@ impl Socket {
             ip: address.ip,
             port: address.port(),
             fd: fd,
+            open: fd >= 0,
         };
     }
 
-    pub func send(self, data: *void, size: u64) u64 {
+    pub func send(mut self, data: *void, size: u64) u64 {
         return unix::send(self.fd, data, size, 0) as u64;
     }
 
-    pub func receive(self, buffer: mut* void, size: u64) u64 {
+    pub func send_str(mut self, str: StringView) u64 {
+        return self.send(str.ptr, str.size);
+    }
+
+    pub func receive(mut self, buffer: mut* void, size: u64) u64 {
         return unix::recv(self.fd, buffer, size, 0) as u64;
     }
 
-    pub func close(self) {
+    pub func close(mut self) {
         unix::close(self.fd);
+        self.open = false;
     }
 }

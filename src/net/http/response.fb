@@ -1,0 +1,116 @@
+mod std::net::http;
+
+import std::c::{malloc, free, memcpy, printf, exit};
+import std::net::http::{Status, HeaderMap};
+import std::net::{Socket};
+
+pub struct Response {
+    pub status: Status,
+    pub headers: HeaderMap,
+
+    buffer: mut* u8,
+    filled: u64,
+    consumed: u64,
+
+    socket: Socket,
+}
+
+impl Response {
+    pub func receive_from(socket: Socket) Self {
+        var res = Response {
+            buffer: malloc(8192u) as mut* u8,
+            socket: socket,
+        };
+
+        for (;;) {
+            // Read data
+            var space = 8192u - res.filled;
+            if (space == 0u) panic("response HTTP header too big");
+
+            var size = socket.receive(&res.buffer[res.filled], space);
+            if (size == 0u) panic("failed to read response HTTP header");
+
+            res.filled += size;
+
+            // Parse header lines
+            for (;;) {
+                var end = find_crlf(&res.buffer[res.consumed], res.filled - res.consumed);
+                if (end < 0) break;
+
+                var line = StringView { ptr: &res.buffer[res.consumed], size: end as u32 };
+                res.consumed += end as u64 + 2u;
+
+                if (line.size == 0u) return res;
+                res.parse_line(line);
+            }
+        }
+
+        return res;
+    }
+
+    func parse_line(mut self, line: StringView) {
+        if (line.starts_with("HTTP/1.0 ") || line.starts_with("HTTP/1.1 ")) {
+            self.status = parse_u32(line.slice(9u, line.size)) as Status;
+        } else {
+            self.parse_header(line);
+        }
+    }
+
+    func parse_header(mut self, line: StringView) {
+        var colon = line.index(":");
+        if (colon < 0) return;
+
+        var key = line.slice(0u, colon as u32).trim();
+        if (key.size == 0u) return;
+
+        var value = line.slice(colon as u32 + 1u, line.size).trim();
+
+        self.headers.insert(key, value);
+    }
+
+    pub func receive(mut self, buffer: mut* void, size: u64) u64 {
+        var available = self.filled - self.consumed;
+
+        if (available > 0u) {
+            var to_read = available;
+            if (to_read > size) to_read = size;
+
+            memcpy(buffer, &self.buffer[self.consumed], to_read);
+            self.consumed += to_read;
+
+            return to_read;
+        }
+
+        return self.socket.receive(buffer, size);
+    }
+
+    pub func close(mut self) {
+        self.headers.free();
+        free(self.buffer);
+    }
+}
+
+func find_crlf(buffer: *u8, size: u64) i64 {
+    for (var i = 0u; i + 1u < size; i++) {
+        if (buffer[i] == '\r' && buffer[i + 1u] == '\n') return i as i64;
+    }
+
+    return -1;
+}
+
+func parse_u32(str: StringView) u32 {
+    var result: u32 = 0u;
+
+    for (var i = 0u; i < str.size; i++) {
+        var c = str.ptr[i];
+        if (c < '0' || c > '9') break;
+        result = result * 10u + (c - '0') as u32;
+    }
+
+    return result;
+}
+
+func panic(msg: StringView) {
+    printf("HTTP response panic: %.*s\n".ptr, msg.size, msg.ptr);
+    exit(1);
+}
