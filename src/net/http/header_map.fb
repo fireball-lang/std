@@ -102,6 +102,6 @@ func case_insensitive_eq(a: StringView, b: StringView) bool {
 }
 
 func to_lower(ch: u8) u8 {
-    if (ch >= 'A' && ch <= 'Z') return (ch - 'A' + 'a') as u8;
+    if (ch >= 'A' && ch <= 'Z') return ch - 'A' + 'a';
     return ch;
 }

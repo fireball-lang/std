@@ -104,7 +104,7 @@ func parse_u32(str: StringView) u32 {
     for (var i = 0u; i < str.size; i++) {
         var c = str.ptr[i];
         if (c < '0' || c > '9') break;
-        result = result * 10u + (c - '0') as u32;
+        result = result * 10u + (c - '0');
     }
 
     return result;

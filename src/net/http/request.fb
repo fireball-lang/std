@@ -137,7 +137,7 @@ func send_u32(socket: Socket, num: u32) {
     var len = 0u;
 
     for (;;) {
-        buffer[len++] = ('0' + num % 10u) as u8;
+        buffer[len++] = '0' + (num % 10u) as u8;
         num /= 10u;
 
         if (num == 0u) break;
