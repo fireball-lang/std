@@ -1,3 +1,5 @@
+#[cfg(target_family = "unix")]
+
 mod std::net::unix;
 
 import std::net::unix::{SocketAddress};

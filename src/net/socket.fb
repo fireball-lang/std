@@ -1,65 +1,59 @@
 mod std::net;
 
-import std::net::unix;
+#[cfg(target_family = "unix")]
+import std::net::unix::{SocketFd, SocketAddress, Domain, Type, Protocol};
 
 pub struct Socket {
     pub ip: [4]u8,
     pub port: u16,
 
+    fd: SocketFd,
     open: bool,
-    fd: i32,
 }
 
 impl Socket {
     pub func connect(ip: [4]u8, port: u16) Self {
-        var address = unix::SocketAddress::new(unix::Domain::IP4, ip, port);
-
-        var fd = unix::socket(unix::Domain::IP4, unix::Type::TCP, unix::Protocol::IP);
-        unix::connect(fd, &address, sizeof(unix::SocketAddress));
+        var address = SocketAddress::new(Domain::IP4, ip, port);
 
         return Self {
             ip: ip,
             port: port,
-            fd: fd,
-            open: fd >= 0,
+            fd: SocketFd::connect(address),
+            open: true,
         };
     }
 
     pub func listen(ip: [4]u8, port: u16) Self {
-        var address = unix::SocketAddress::new(unix::Domain::IP4, ip, port);
-
-        var fd = unix::socket(unix::Domain::IP4, unix::Type::TCP, unix::Protocol::IP);
-        unix::bind(fd, &address, sizeof(unix::SocketAddress));
-        unix::listen(fd, 64);
+        var address = SocketAddress::new(Domain::IP4, ip, port);
 
         return Self {
             ip: ip,
             port: port,
-            fd: fd,
-            open: fd >= 0,
+            fd: SocketFd::listen(address),
+            open: true,
         };
     }
 
     pub func is_open(self) bool {
-        return self.open;
+        return self.open && self.fd.is_open();
     }
 
     pub func accept(self) Self {
-        var address: unix::SocketAddress;
-        var address_len = sizeof(unix::SocketAddress);
+        var address: SocketAddress;
+        var address_len = sizeof(SocketAddress);
 
-        var fd = unix::accept(self.fd, &address, &address_len);
+        var fd = self.fd.accept(&address, &address_len);
 
         return Self {
             ip: address.ip,
             port: address.port(),
             fd: fd,
-            open: fd >= 0,
+            open: true,
         };
     }
 
     pub func send(mut self, data: *void, size: u64) u64 {
-        return unix::send(self.fd, data, size, 0) as u64;
+        return self.fd.send(data, size);
     }
 
     pub func send_str(mut self, str: StringView) u64 {
@@ -67,11 +61,11 @@ impl Socket {
     }
 
     pub func receive(mut self, buffer: mut* void, size: u64) u64 {
-        return unix::recv(self.fd, buffer, size, 0) as u64;
+        return self.fd.receive(buffer, size);
     }
 
     pub func close(mut self) {
-        unix::close(self.fd);
+        self.fd.close();
         self.open = false;
     }
 }
