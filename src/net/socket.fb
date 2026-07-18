@@ -1,5 +1,8 @@
 mod std::net;
 
+#[cfg(target_family = "windows")]
+import std::net::windows::{SocketFd, SocketAddress, Domain, Type, Protocol};
+
 #[cfg(target_family = "unix")]
 import std::net::unix::{SocketFd, SocketAddress, Domain, Type, Protocol};
 

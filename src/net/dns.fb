@@ -1,12 +1,16 @@
 mod std::net;
 
-import std::net::unix::{DnsEntry, getaddrinfo, freeaddrinfo};
+#[cfg(target_family = "windows")]
+import std::net::windows::{DnsEntry, Domain, Type, getaddrinfo, freeaddrinfo};
+#[cfg(target_family = "unix")]
+import std::net::unix::{DnsEntry, Domain, Type, getaddrinfo, freeaddrinfo};
+
 import std::c::{to_cstring, free, printf};
 
 pub func resolve_domain(domain: StringView, buffer: mut* [4]u8, capacity: u32) u32 {
     var hints = DnsEntry {
-        family:   2, // IPv4
-        socktype: 1, // TCP
+        family:   Domain::IP4,
+        socktype: Type::TCP,
     };
 
     var results: *DnsEntry;

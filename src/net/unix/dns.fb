@@ -2,12 +2,12 @@
 
 mod std::net::unix;
 
-import std::net::unix::{SocketAddress};
+import std::net::unix::{SocketAddress, Domain, Type};
 
 pub struct DnsEntry {
     pub flags: i32,
-    pub family: i32,
-    pub socktype: i32,
+    pub family: Domain,
+    pub socktype: Type,
     pub protocol: i32,
     pub addrlen: u32,
     pub addr: *SocketAddress,
