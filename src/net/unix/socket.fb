@@ -41,28 +41,28 @@ impl SocketAddress {
 }
 
 #[extern]
-pub func socket(domain: Domain, type_: Type, protocol: Protocol) i32
+pub func socket(domain: Domain, type_: Type, protocol: Protocol) i32;
 
 #[extern]
-pub func bind(fd: i32, addr: *SocketAddress, len: u32) i32
+pub func bind(fd: i32, addr: *SocketAddress, len: u32) i32;
 
 #[extern]
-pub func connect(fd: i32, addr: *SocketAddress, len: u32) i32
+pub func connect(fd: i32, addr: *SocketAddress, len: u32) i32;
 
 #[extern]
-pub func listen(fd: i32, backlog: i32) i32
+pub func listen(fd: i32, backlog: i32) i32;
 
 #[extern]
-pub func accept(fd: i32, addr: mut* SocketAddress, len: mut* u32) i32
+pub func accept(fd: i32, addr: mut* SocketAddress, len: mut* u32) i32;
 
 #[extern]
-pub func send(fd: i32, buf: *void, len: u64, flags: i32) i64
+pub func send(fd: i32, buf: *void, len: u64, flags: i32) i64;
 
 #[extern]
-pub func recv(fd: i32, buf: mut* void, len: u64, flags: i32) i64
+pub func recv(fd: i32, buf: mut* void, len: u64, flags: i32) i64;
 
 #[extern]
-pub func close(fd: i32) i32
+pub func close(fd: i32) i32;
 
 // SocketFd
 

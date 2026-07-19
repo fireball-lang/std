@@ -16,10 +16,10 @@ pub struct DnsEntry {
 }
 
 #[extern, link_name("getaddrinfo")]
-func getaddrinfo_(name: *u8, service: *u8, hints: *DnsEntry, result: mut** DnsEntry) i32
+func getaddrinfo_(name: *u8, service: *u8, hints: *DnsEntry, result: mut** DnsEntry) i32;
 
 #[extern]
-pub func freeaddrinfo(result: *DnsEntry) void
+pub func freeaddrinfo(result: *DnsEntry);
 
 pub func getaddrinfo(name: *u8, service: *u8, hints: *DnsEntry, result: mut** DnsEntry) i32 {
     ensure_wsa_initialized();

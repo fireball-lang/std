@@ -16,7 +16,7 @@ pub struct DnsEntry {
 }
 
 #[extern]
-pub func getaddrinfo(name: *u8, service: *u8, hints: *DnsEntry, result: mut** DnsEntry) i32
+pub func getaddrinfo(name: *u8, service: *u8, hints: *DnsEntry, result: mut** DnsEntry) i32;
 
 #[extern]
-pub func freeaddrinfo(result: *DnsEntry) void
+pub func freeaddrinfo(result: *DnsEntry);

@@ -54,31 +54,31 @@ impl SocketAddress {
 }
 
 #[extern, link_name("WSAStartup")]
-pub func wsa_startup(version: u16, data: mut* WsaData) i32
+pub func wsa_startup(version: u16, data: mut* WsaData) i32;
 
 #[extern]
-pub func socket(domain: Domain, type_: Type, protocol: Protocol) u64
+pub func socket(domain: Domain, type_: Type, protocol: Protocol) u64;
 
 #[extern]
-pub func bind(fd: u64, addr: *SocketAddress, len: i32) i32
+pub func bind(fd: u64, addr: *SocketAddress, len: i32) i32;
 
 #[extern]
-pub func connect(fd: u64, addr: *SocketAddress, len: i32) i32
+pub func connect(fd: u64, addr: *SocketAddress, len: i32) i32;
 
 #[extern]
-pub func listen(fd: u64, backlog: i32) i32
+pub func listen(fd: u64, backlog: i32) i32;
 
 #[extern]
-pub func accept(fd: u64, addr: mut* SocketAddress, len: mut* i32) u64
+pub func accept(fd: u64, addr: mut* SocketAddress, len: mut* i32) u64;
 
 #[extern]
-pub func send(fd: u64, buf: *void, len: i32, flags: i32) i64
+pub func send(fd: u64, buf: *void, len: i32, flags: i32) i64;
 
 #[extern]
-pub func recv(fd: u64, buf: mut* void, len: i32, flags: i32) i64
+pub func recv(fd: u64, buf: mut* void, len: i32, flags: i32) i64;
 
 #[extern]
-pub func closesocket(fd: u64) i32
+pub func closesocket(fd: u64) i32;
 
 // SocketFd
 
