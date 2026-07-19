@@ -25,10 +25,10 @@ impl Response {
         for (;;) {
             // Read data
             var space = 8192u - res.filled;
-            if (space == 0u) panic("response HTTP header too big");
+            if (space == 0u) panic("Response HTTP header too big");
 
             var size = socket.receive(&res.buffer[res.filled], space);
-            if (size == 0u) panic("failed to read response HTTP header");
+            if (size == 0u) panic("Failed to read response HTTP header");
 
             res.filled += size;
 
@@ -108,9 +108,4 @@ func parse_u32(str: StringView) u32 {
     }
 
     return result;
-}
-
-func panic(msg: StringView) {
-    printf("HTTP response panic: %.*s\n".ptr, msg.size, msg.ptr);
-    exit(1);
 }

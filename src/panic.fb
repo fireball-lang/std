@@ -1,0 +1,13 @@
+mod std;
+
+import std::c::{printf, exit};
+
+#[init]
+func init_panic() {
+    set_panic_handler(panic_handler);
+}
+
+func panic_handler(msg: StringView) {
+    printf("panic: %.*s\n".ptr, msg.size, msg.ptr);
+    exit(1);
+}
