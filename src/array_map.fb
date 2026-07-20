@@ -22,7 +22,7 @@ impl[K: Eq, V] ArrayMap[K, V] {
             }
         }
 
-        self.items.add(Item::[K, V] {
+        self.items.add(Item:[K, V] {
             key: key,
             value: value,
         });
