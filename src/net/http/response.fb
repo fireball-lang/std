@@ -3,6 +3,7 @@ mod std::net::http;
 import std::c::{malloc, free, memcpy, printf, exit};
 import std::net::http::{Status, HeaderMap};
 import std::net::{Socket};
+import std::io::{Reader};
 
 pub struct Response {
     pub status: Status,
@@ -25,10 +26,16 @@ impl Response {
         for (;;) {
             // Read data
             var space = 8192u - res.filled;
-            if (space == 0u) return Option:[Self]::none();
+            if (space == 0u) {
+                free(res.buffer);
+                return Option:[Self]::none();
+            }
 
-            var size = socket.receive(&res.buffer[res.filled], space);
-            if (size == 0u) return Option:[Self]::none();
+            var size = socket.read(&res.buffer[res.filled], space) or 0u;
+            if (size == 0u) {
+                free(res.buffer);
+                return Option:[Self]::none();
+            }
 
             res.filled += size;
 
@@ -68,7 +75,14 @@ impl Response {
         self.headers.insert(key, value);
     }
 
-    pub func receive(mut self, buffer: mut* void, size: u64) u64 {
+    pub func close(mut self) {
+        self.headers.free();
+        free(self.buffer);
+    }
+}
+
+impl Response : Reader {
+    pub func read(mut self, buffer: mut* void, size: u64) ?u64 {
         var available = self.filled - self.consumed;
 
         if (available > 0u) {
@@ -81,12 +95,7 @@ impl Response {
             return to_read;
         }
 
-        return self.socket.receive(buffer, size);
-    }
-
-    pub func close(mut self) {
-        self.headers.free();
-        free(self.buffer);
+        return self.socket.read(buffer, size);
     }
 }
 

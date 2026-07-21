@@ -85,47 +85,47 @@ impl Request {
         if (!has_user_agent) self.send_header(socket, "User-Agent", "fireball-std");
         if (!has_accept) self.send_header(socket, "Accept", "*/*");
 
-        socket.send_str("Content-Length: ");
+        socket.write_str("Content-Length: ");
         send_u32(socket, self.body_size);
-        socket.send_str("\r\n");
+        socket.write_str("\r\n");
 
-        socket.send_str("\r\n");
+        socket.write_str("\r\n");
 
         // Send body
-        socket.send(self.body_data, self.body_size);
+        socket.write(self.body_data, self.body_size);
 
         // Receive resposne
         return Response::receive_from(socket);
     }
 
     func send_line(mut self, socket: Socket) {
-        socket.send_str(self.method.string());
-        socket.send_str(" ");
+        socket.write_str(self.method.string());
+        socket.write_str(" ");
 
         if (self.uri.path.size > 0u) {
-            socket.send_str(self.uri.path);
+            socket.write_str(self.uri.path);
         } else {
-            socket.send_str("/");
+            socket.write_str("/");
         }
 
         if (self.uri.query.size > 0u) {
-            socket.send_str("?");
-            socket.send_str(self.uri.query);
+            socket.write_str("?");
+            socket.write_str(self.uri.query);
         }
 
         if (self.uri.fragment.size > 0u) {
-            socket.send_str("#");
-            socket.send_str(self.uri.fragment);
+            socket.write_str("#");
+            socket.write_str(self.uri.fragment);
         }
 
-        socket.send_str(" HTTP/1.0\r\n");
+        socket.write_str(" HTTP/1.0\r\n");
     }
 
     func send_header(mut self, socket: Socket, key: StringView, value: StringView) {
-        socket.send_str(key);
-        socket.send_str(": ");
-        socket.send_str(value);
-        socket.send_str("\r\n");
+        socket.write_str(key);
+        socket.write_str(": ");
+        socket.write_str(value);
+        socket.write_str("\r\n");
     }
 
     pub func close(mut self) {
@@ -150,7 +150,7 @@ func send_u32(socket: Socket, num: u32) {
         buffer[len - i - 1u] = temp;
     }
 
-    socket.send_str(StringView {
+    socket.write_str(StringView {
         ptr: &buffer[0],
         size: len,
     });

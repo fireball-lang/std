@@ -9,13 +9,16 @@ pub func fopen(path: *u8, mode: *u8) *File;
 pub func fclose(file: *File) i32;
 
 #[extern]
-pub func fflush(file: *File) i32;
-
-#[extern]
 pub func fread(buffer: mut *void, size: u64, count: u64, file: *File) u64;
 
 #[extern]
 pub func fwrite(data: *void, size: u64, count: u64, file: *File) u64;
+
+#[extern]
+pub func fflush(file: *File) i32;
+
+#[extern]
+pub func ferror(file: *File) i32;
 
 #[extern]
 pub func printf(fmt: *u8, ...);

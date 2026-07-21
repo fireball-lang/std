@@ -1,0 +1,82 @@
+mod std::os;
+
+import std::io::{Reader, Writer};
+import std::c;
+
+pub struct File {
+    fd: *c::File,
+}
+
+impl File {
+    pub func create(path: StringView) ?Self {
+        return Self::open_raw(path, "w");
+    }
+
+    pub func open(path: StringView) ?Self {
+        return Self::open_raw(path, "r");
+    }
+
+    func open_raw(path: StringView, mode: StringView) ?Self {
+        // Open FD
+        var c_path = c::to_cstring(path);
+        var fd = c::fopen(c_path, mode.ptr);
+        c::free(c_path);
+
+        if (fd == null) return Option:[Self]::none();
+
+        // Create File
+        return File {
+            fd: fd,
+        };
+    }
+
+    pub func close(mut self) {
+        if (self.fd == null) panic("tried to close an already closed file");
+
+        c::fclose(self.fd);
+
+        self.fd = null;
+    }
+}
+
+impl File : Reader {
+    pub func read(mut self, buffer: mut* void, size: u64) ?u64 {
+        // Read
+        if (size == 0u) return 0u;
+        var read = c::fread(buffer, 1u, size, self.fd);
+
+        // Some amount of bytes read
+        if (read > 0u) {
+            return read;
+        }
+
+        // Error
+        if (size > 0u && c::ferror(self.fd) != 0) {
+            return Option:[u64]::none();
+        }
+
+        // EOF
+        return 0u;
+    }
+}
+
+impl File : Writer {
+    pub func write(mut self, data: *void, size: u64) ?u64 {
+        // Write
+        if (size == 0u) return 0u;
+        var written = c::fwrite(data, 1u, size, self.fd);
+
+        // Some amount of bytes written
+        if (written > 0u) {
+            return written;
+        }
+
+        // Error
+        if (size > 0u && c::ferror(self.fd) != 0) {
+            return Option:[u64]::none();
+        }
+
+        // Called with 0 size
+        return 0u;
+    }
+}

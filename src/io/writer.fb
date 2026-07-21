@@ -1,0 +1,5 @@
+mod std::io;
+
+pub interface Writer {
+    func write(mut self, data: *void, size: u64) ?u64;
+}

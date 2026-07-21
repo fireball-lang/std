@@ -72,10 +72,10 @@ pub func listen(fd: u64, backlog: i32) i32;
 pub func accept(fd: u64, addr: mut* SocketAddress, len: mut* i32) u64;
 
 #[extern]
-pub func send(fd: u64, buf: *void, len: i32, flags: i32) i64;
+pub func send(fd: u64, buf: *void, len: i32, flags: i32) i32;
 
 #[extern]
-pub func recv(fd: u64, buf: mut* void, len: i32, flags: i32) i64;
+pub func recv(fd: u64, buf: mut* void, len: i32, flags: i32) i32;
 
 #[extern]
 pub func closesocket(fd: u64) i32;
@@ -103,6 +103,8 @@ pub struct SocketFd {
 
 impl SocketFd {
     pub func new(domain: Domain, type_: Type, protocol: Protocol) ?Self {
+        ensure_wsa_initialized();
+
         var fd = socket(domain, type_, protocol);
         if (fd == 0xFFFFFFFFFFFFFFFF) return Option:[Self]::none();
 
@@ -112,7 +114,10 @@ impl SocketFd {
     pub func connect(address: SocketAddress) ?Self {
         var fd = Self::new(address.domain as Domain, Type::TCP, Protocol::IP)?;
 
-        if (connect(fd.fd, &address, sizeof(SocketAddress) as i32) < 0) fd.close();
+        if (connect(fd.fd, &address, sizeof(SocketAddress) as i32) < 0) {
+            fd.close();
+            return Option:[Self]::none();
+        }
 
         return fd;
     }
@@ -120,8 +125,14 @@ impl SocketFd {
     pub func listen(address: SocketAddress) ?Self {
         var fd = Self::new(address.domain as Domain, Type::TCP, Protocol::IP)?;
 
-        if (bind(fd.fd, &address, sizeof(SocketAddress) as i32) < 0) fd.close();
-        else if (listen(fd.fd, 64) < 0) fd.close();
+        if (bind(fd.fd, &address, sizeof(SocketAddress) as i32) < 0) {
+            fd.close();
+            return Option:[Self]::none();
+        }
+        else if (listen(fd.fd, 64) < 0) {
+            fd.close();
+            return Option:[Self]::none();
+        }
 
         return fd;
     }
@@ -141,20 +152,41 @@ impl SocketFd {
         return Self { fd: fd };
     }
 
-    pub func send(mut self, data: *void, size: u64) u64 {
-        if (size > 2_147_483_647u) {
-            panic("SocketFd.send() - size too big");
+    pub func send(mut self, data: *void, size: u64) ?u64 {
+        if (size > 2_147_483_647u) panic("SocketFd.send() - size too big");
+
+        // Send
+        if (size == 0u) return 0u;
+        var sent = send(self.fd, data, size as i32, 0);
+
+        // Some amount of bytes sent
+        if (sent > 0) {
+            return sent as u64;
         }
 
-        return send(self.fd, data, size as i32, 0) as u64;
+        // Error
+        return Option:[u64]::none();
     }
 
-    pub func receive(mut self, buffer: mut* void, size: u64) u64 {
-        if (size > 2_147_483_647u) {
-            panic("SocketFd.send() - size too big");
+    pub func receive(mut self, buffer: mut* void, size: u64) ?u64 {
+        if (size > 2_147_483_647u) panic("SocketFd.send() - size too big");
+
+        // Receive
+        if (size == 0u) return 0u;
+        var read = recv(self.fd, buffer, size as i32, 0);
+
+        // Some amount of bytes read
+        if (read > 0) {
+            return read as u64;
         }
 
-        return recv(self.fd, buffer, size as i32, 0) as u64;
+        // EOF
+        if (read == 0) {
+            return 0u;
+        }
+
+        // Error
+        return Option:[u64]::none();
     }
 
     pub func close(mut self) {

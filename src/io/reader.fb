@@ -1,0 +1,5 @@
+mod std::io;
+
+pub interface Reader {
+    func read(mut self, buffer: mut* void, size: u64) ?u64;
+}

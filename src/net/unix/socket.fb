@@ -81,7 +81,10 @@ impl SocketFd {
     pub func connect(address: SocketAddress) ?Self {
         var fd = Self::new(address.domain as Domain, Type::TCP, Protocol::IP)?;
 
-        if (connect(fd.fd, &address, sizeof(SocketAddress)) < 0) fd.close();
+        if (connect(fd.fd, &address, sizeof(SocketAddress)) < 0) {
+            fd.close();
+            return Option:[Self]::none();
+        }
 
         return fd;
     }
@@ -89,8 +92,14 @@ impl SocketFd {
     pub func listen(address: SocketAddress) ?Self {
         var fd = Self::new(address.domain as Domain, Type::TCP, Protocol::IP)?;
 
-        if (bind(fd.fd, &address, sizeof(SocketAddress)) < 0) fd.close();
-        else if (listen(fd.fd, 64) < 0) fd.close();
+        if (bind(fd.fd, &address, sizeof(SocketAddress)) < 0) {
+            fd.close();
+            return Option:[Self]::none();
+        }
+        else if (listen(fd.fd, 64) < 0) {
+            fd.close();
+            return Option:[Self]::none();
+        }
 
         return fd;
     }
@@ -106,12 +115,37 @@ impl SocketFd {
         return Self { fd: fd };
     }
 
-    pub func send(mut self, data: *void, size: u64) u64 {
-        return send(self.fd, data, size, 0) as u64;
+    pub func send(mut self, data: *void, size: u64) ?u64 {
+        // Send
+        if (size == 0u) return 0u;
+        var sent = send(self.fd, data, size, 0);
+
+        // Some amount of bytes sent
+        if (sent > 0) {
+            return sent as u64;
+        }
+
+        // Error
+        return Option:[u64]::none();
     }
 
-    pub func receive(mut self, buffer: mut* void, size: u64) u64 {
-        return recv(self.fd, buffer, size, 0) as u64;
+    pub func receive(mut self, buffer: mut* void, size: u64) ?u64 {
+        // Receive
+        if (size == 0u) return 0u;
+        var read = recv(self.fd, buffer, size, 0);
+
+        // Some amount of bytes read
+        if (read > 0) {
+            return read as u64;
+        }
+
+        // EOF
+        if (read == 0) {
+            return 0u;
+        }
+
+        // Error
+        return Option:[u64]::none();
     }
 
     pub func close(mut self) {
