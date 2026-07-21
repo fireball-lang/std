@@ -9,7 +9,7 @@ pub struct Uri {
 }
 
 impl Uri {
-    pub func parse(str: StringView) Uri {
+    pub func parse(str: StringView) ?Uri {
         var result: Uri;
         var remaining = str;
 

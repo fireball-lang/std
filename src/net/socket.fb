@@ -15,24 +15,24 @@ pub struct Socket {
 }
 
 impl Socket {
-    pub func connect(ip: [4]u8, port: u16) Self {
+    pub func connect(ip: [4]u8, port: u16) ?Self {
         var address = SocketAddress::new(Domain::IP4, ip, port);
 
         return Self {
             ip: ip,
             port: port,
-            fd: SocketFd::connect(address),
+            fd: SocketFd::connect(address)?,
             open: true,
         };
     }
 
-    pub func listen(ip: [4]u8, port: u16) Self {
+    pub func listen(ip: [4]u8, port: u16) ?Self {
         var address = SocketAddress::new(Domain::IP4, ip, port);
 
         return Self {
             ip: ip,
             port: port,
-            fd: SocketFd::listen(address),
+            fd: SocketFd::listen(address)?,
             open: true,
         };
     }
@@ -41,16 +41,14 @@ impl Socket {
         return self.open && self.fd.is_open();
     }
 
-    pub func accept(self) Self {
+    pub func accept(self) ?Self {
         var address: SocketAddress;
         var address_len = sizeof(SocketAddress);
-
-        var fd = self.fd.accept(&address, &address_len);
 
         return Self {
             ip: address.ip,
             port: address.port(),
-            fd: fd,
+            fd: self.fd.accept(&address, &address_len)?,
             open: true,
         };
     }

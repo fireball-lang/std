@@ -13,53 +13,54 @@ pub struct Request {
 }
 
 impl Request {
-    pub func get(url: StringView) Self {
+    pub func get(url: StringView) ?Self {
         return Self {
             method: Method::GET,
-            uri: Uri::parse(url),
+            uri: Uri::parse(url)?,
         };
     }
 
-    pub func delete(url: StringView) Self {
+    pub func delete(url: StringView) ?Self {
         return Self {
             method: Method::DELETE,
-            uri: Uri::parse(url),
+            uri: Uri::parse(url)?,
         };
     }
 
-    pub func put(url: StringView, data: *void, size: u32) Self {
+    pub func put(url: StringView, data: *void, size: u32) ?Self {
         return Self {
             method: Method::PUT,
-            uri: Uri::parse(url),
+            uri: Uri::parse(url)?,
             body_data: data,
             body_size: size,
         };
     }
 
-    pub func post(url: StringView, data: *void, size: u32) Self {
+    pub func post(url: StringView, data: *void, size: u32) ?Self {
         return Self {
             method: Method::POST,
-            uri: Uri::parse(url),
+            uri: Uri::parse(url)?,
             body_data: data,
             body_size: size,
         };
     }
 
-    pub func send(mut self) Response {
+    pub func send(mut self) ?Response {
         // Connect to server
         var ips: [4][4]u8;
         var size = resolve_domain(self.uri.authority, &ips[0], 4u);
 
-        var socket: Socket;
+        var socket_opt: ?Socket;
 
-        for (var i = 0u; i < size && !socket.is_open(); i++) {
-            socket = Socket::connect(ips[i], 80u);
+        for (var i = 0u; i < size && socket_opt.is_none(); i++) {
+            socket_opt = Socket::connect(ips[i], 80u);
         }
 
-        if (!socket.is_open()) {
-            var empty: Response;
-            return empty;
+        if (socket_opt.is_none()) {
+            return Option:[Response]::none();
         }
+
+        var socket = socket_opt.unwrap();
 
         // Send request line
         self.send_line(socket);

@@ -102,23 +102,26 @@ pub struct SocketFd {
 }
 
 impl SocketFd {
-    pub func new(domain: Domain, type_: Type, protocol: Protocol) Self {
-        return Self { fd: socket(domain, type_, protocol) };
+    pub func new(domain: Domain, type_: Type, protocol: Protocol) ?Self {
+        var fd = socket(domain, type_, protocol);
+        if (fd == 0xFFFFFFFFFFFFFFFF) return Option:[Self]::none();
+
+        return Self { fd: fd };
     }
 
-    pub func connect(address: SocketAddress) Self {
-        var fd = Self::new(address.domain as Domain, Type::TCP, Protocol::IP);
+    pub func connect(address: SocketAddress) ?Self {
+        var fd = Self::new(address.domain as Domain, Type::TCP, Protocol::IP)?;
 
-        if (fd.is_open() && connect(fd.fd, &address, sizeof(SocketAddress) as i32) < 0) fd.close();
+        if (connect(fd.fd, &address, sizeof(SocketAddress) as i32) < 0) fd.close();
 
         return fd;
     }
 
-    pub func listen(address: SocketAddress) Self {
-        var fd = Self::new(address.domain as Domain, Type::TCP, Protocol::IP);
+    pub func listen(address: SocketAddress) ?Self {
+        var fd = Self::new(address.domain as Domain, Type::TCP, Protocol::IP)?;
 
-        if (fd.is_open() && bind(fd.fd, &address, sizeof(SocketAddress) as i32) < 0) fd.close();
-        if (fd.is_open() && listen(fd.fd, 64) < 0) fd.close();
+        if (bind(fd.fd, &address, sizeof(SocketAddress) as i32) < 0) fd.close();
+        else if (listen(fd.fd, 64) < 0) fd.close();
 
         return fd;
     }
@@ -127,9 +130,11 @@ impl SocketFd {
         return self.fd != 0xFFFFFFFFFFFFFFFF;
     }
 
-    pub func accept(self, address: mut* SocketAddress, address_len: mut* u32) Self {
+    pub func accept(self, address: mut* SocketAddress, address_len: mut* u32) ?Self {
         var address_len_i32 = *address_len as i32;
+
         var fd = accept(self.fd, address, &address_len_i32);
+        if (fd == 0xFFFFFFFFFFFFFFFF) return Option:[Self]::none();
 
         *address_len = address_len_i32 as u32;
 

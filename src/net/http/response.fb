@@ -16,7 +16,7 @@ pub struct Response {
 }
 
 impl Response {
-    pub func receive_from(socket: Socket) Self {
+    pub func receive_from(socket: Socket) ?Self {
         var res = Response {
             buffer: malloc(8192u) as mut* u8,
             socket: socket,
@@ -25,10 +25,10 @@ impl Response {
         for (;;) {
             // Read data
             var space = 8192u - res.filled;
-            if (space == 0u) panic("Response HTTP header too big");
+            if (space == 0u) return Option:[Self]::none();
 
             var size = socket.receive(&res.buffer[res.filled], space);
-            if (size == 0u) panic("Failed to read response HTTP header");
+            if (size == 0u) return Option:[Self]::none();
 
             res.filled += size;
 
