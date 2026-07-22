@@ -1,0 +1,81 @@
+#[cfg(target_family = "unix")]
+
+mod std::os::unix;
+
+import std::c::{to_cstring, free};
+
+// Bindings
+
+#[cfg(target_os = "linux")]
+enum Flags : i32 {
+    Lazy = 0x00001,
+    Now = 0x00002,
+    NoLoad = 0x00004,
+
+    Global = 0x00100,
+    Local = 0x0000,
+
+    NoDelete = 0x01000,
+}
+
+#[cfg(target_os = "macos")]
+enum Flags : i32 {
+    Lazy = 0x00001,
+    Now = 0x00002,
+    NoLoad = 0x00010,
+
+    Global = 0x00008,
+    Local = 0x0004,
+
+    NoDelete = 0x00080,
+}
+
+#[extern]
+func dlopen(name: *u8, flags: i32) *void;
+
+#[extern]
+func dlsym(handle: *void, name: *u8) *void;
+
+#[extern]
+func dlclose(handle: *void) i32;
+
+// Library
+
+pub struct Library {
+    handle: *void,
+}
+
+impl Library {
+    pub func open(name: StringView) ?Self {
+        var c_name = to_cstring(name);
+        var handle = dlopen(c_name, Flags::Lazy as i32 | Flags::Local as i32);
+        free(c_name);
+
+        if (handle == null) {
+            return Option:[Self]::none();
+        }
+
+        return Self {
+            handle: handle,
+        };
+    }
+
+    pub func get(self, name: StringView) ?*void {
+        var c_name = to_cstring(name);
+        var symbol = dlsym(self.handle, c_name);
+        free(c_name);
+
+        if (symbol == null) {
+            return Option:[*void]::none();
+        }
+
+        return symbol;
+    }
+
+    pub func close(mut self) {
+        if (self.handle == null) panic("tried to close an already closed Library");
+
+        dlclose(self.handle);
+        self.handle = null;
+    }
+}

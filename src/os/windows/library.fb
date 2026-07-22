@@ -1,0 +1,57 @@
+#[cfg(target_family = "windows")]
+
+mod std::os::windows;
+
+import std::c::{to_cstring, free};
+
+// Bindings
+
+#[extern]
+func LoadLibraryA(name: *u8) *void;
+
+#[extern]
+func GetProcAddress(module: *void, name: *u8) *void;
+
+#[extern]
+func FreeLibrary(module: *void) i32;
+
+// Library
+
+pub struct Library {
+    module: *void,
+}
+
+impl Library {
+    pub func open(name: StringView) ?Self {
+        var c_name = to_cstring(name);
+        var module = LoadLibraryA(c_name);
+        free(c_name);
+
+        if (module == null) {
+            return Option:[Self]::none();
+        }
+
+        return Self {
+            module: module,
+        };
+    }
+
+    pub func get(self, name: StringView) ?*void {
+        var c_name = to_cstring(name);
+        var symbol = GetProcAddress(self.module, c_name);
+        free(c_name);
+
+        if (symbol == null) {
+            return Option:[*void]::none();
+        }
+
+        return symbol;
+    }
+
+    pub func close(mut self) {
+        if (self.module == null) panic("tried to close an already closed Library");
+
+        FreeLibrary(self.module);
+        self.module = null;
+    }
+}

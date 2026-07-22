@@ -1,0 +1,26 @@
+mod std::os;
+
+#[cfg(target_family = "windows")]
+import std::os::windows as imp;
+#[cfg(target_family = "unix")]
+import std::os::unix as imp;
+
+pub struct Library {
+    imp: imp::Library,
+}
+
+impl Library {
+    pub func open(name: StringView) ?Self {
+        return Self {
+            imp: imp::Library::open(name)?,
+        };
+    }
+
+    pub func get(self, name: StringView) ?*void {
+        return self.imp.get(name);
+    }
+
+    pub func close(mut self) {
+        self.imp.close();
+    }
+}
