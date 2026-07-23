@@ -6,6 +6,7 @@ import std::c::{printf, exit};
 
 // Bindings
 
+#[repr(C)]
 pub struct WsaData {
     pub version: u16,
     pub high_version: u16,
@@ -31,6 +32,7 @@ pub enum Protocol : i32 {
     UDP = 17,
 }
 
+#[repr(C)]
 pub struct SocketAddress {
     pub domain: u16,
     port: u16,

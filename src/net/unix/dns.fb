@@ -4,6 +4,7 @@ mod std::net::unix;
 
 import std::net::unix::{SocketAddress, Domain, Type};
 
+#[repr(C)]
 pub struct DnsEntry {
     pub flags: i32,
     pub family: Domain,

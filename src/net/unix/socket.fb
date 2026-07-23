@@ -18,6 +18,7 @@ pub enum Protocol : i32 {
     IP = 0,
 }
 
+#[repr(C)]
 pub struct SocketAddress {
     pub domain: u16,
     port: u16,
