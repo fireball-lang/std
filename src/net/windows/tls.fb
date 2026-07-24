@@ -1,0 +1,336 @@
+#[cfg(target_os = "windows")]
+
+mod std::net::windows;
+
+import std::net::windows::{SocketAddress, Domain, SocketFd};
+import std::c::{to_cstring, malloc, free};
+
+// SChannel
+
+#[repr(C)]
+struct SecHandle {
+    dwLower: u64,
+    dwUpper: u64,
+}
+
+#[repr(C)]
+struct SecBuffer {
+    cbBuffer: u32,
+    BufferType: u32,
+    pvBuffer: *void,
+}
+
+#[repr(C)]
+struct SecBufferDesc {
+    ulVersion: u32,
+    cBuffers: u32,
+    pBuffers: *SecBuffer,
+}
+
+#[repr(C)]
+struct SecPkgContext_StreamSizes {
+    cbHeader: u32,
+    cbTrailer: u32,
+    cbMaximumMessage: u32,
+    cBuffers: u32,
+    cbBlockSize: u32,
+}
+
+#[extern]
+func AcquireCredentialsHandleA(pszPrincipal: *void, pszPackage: *void, fCredentialUse: u32, pvLogonID: *void, pAuthData: *void, pGetKeyFn: *void, pvGetKeyArgument: *void, phCredential: *SecHandle, ptsExpiry: *void) i32;
+
+#[extern]
+func InitializeSecurityContextA(phCredential: *SecHandle, phContext: *SecHandle, pszTargetName: *void, fContextReq: u32, Reserved1: u32, TargetDataRep: u32, pInput: *SecBufferDesc, Reserved2: u32, phNewContext: *SecHandle, pOutput: *SecBufferDesc, pfContextAttr: mut* u32, ptsExpiry: *void) i32;
+
+#[extern]
+func QueryContextAttributesA(phContext: *SecHandle, ulAttribute: u32, pBuffer: *void) i32;
+
+#[extern]
+func EncryptMessage(phContext: *SecHandle, fQOP: u32, pMessage: *SecBufferDesc, MessageSeqNo: u32) i32;
+
+#[extern]
+func DecryptMessage(phContext: *SecHandle, pMessage: *SecBufferDesc, MessageSeqNo: u32, pfQOP: mut* u32) i32;
+
+#[extern]
+func DeleteSecurityContext(phContext: *SecHandle) i32;
+
+#[extern]
+func FreeCredentialsHandle(phCredential: *SecHandle) i32;
+
+#[extern]
+func FreeContextBuffer(pvContextBuffer: *void) i32;
+
+// TlsSocket
+
+pub struct TlsSocket {
+    fd: SocketFd,
+    cred: SecHandle,
+    ctx: SecHandle,
+    sizes: SecPkgContext_StreamSizes,
+
+    in_data: mut* u8,
+    in_len: u32,
+
+    dec_data: mut* u8,
+    dec_len: u32,
+    dec_offset: u32,
+
+    out_data: mut* u8,
+}
+
+impl TlsSocket {
+    pub func connect(ip: [4]u8, port: u16, hostname: StringView) ?Self {
+        var address = SocketAddress::new(Domain::IP4, ip, port);
+        var fd = SocketFd::connect(address)?;
+
+        var cred: SecHandle;
+        var ctx: SecHandle;
+        var sizes: SecPkgContext_StreamSizes;
+
+        // 2 = SECPKG_CRED_OUTBOUND
+        var schannel_name = to_cstring("Microsoft Unified Security Protocol Provider");
+        var status = AcquireCredentialsHandleA(null, schannel_name, 2u, null, null, null, null, &cred, null) as u32;
+        free(schannel_name);
+
+        if (status != 0u) {
+            fd.close();
+            return Option:[Self]::none();
+        }
+
+        // ISC_REQ_ALLOCATE_MEMORY | ISC_REQ_STREAM | ISC_REQ_CONFIDENTIALITY | ISC_REQ_SEQUENCE_DETECT | ISC_REQ_REPLAY_DETECT
+        var req_flags = 0x0000811C;
+        var ctx_flags: u32 = 0u;
+        var target = to_cstring(hostname);
+
+        var out_buf = SecBuffer { cbBuffer: 0u, BufferType: 2u, pvBuffer: null };
+        var out_desc = SecBufferDesc { ulVersion: 0u, cBuffers: 1u, pBuffers: &out_buf };
+
+        // Generate the ClientHello token
+        status = InitializeSecurityContextA(&cred, null, target, req_flags, 0u, 0u, null, 0u, &ctx, &out_desc, &ctx_flags, null) as u32;
+
+        if (out_buf.cbBuffer > 0u) {
+            fd.send(out_buf.pvBuffer, out_buf.cbBuffer);
+            FreeContextBuffer(out_buf.pvBuffer);
+        }
+
+        var in_data = malloc(32768u) as mut* u8;
+        var in_len: u32 = 0u;
+
+        // SEC_I_CONTINUE_NEEDED (0x00090312) or SEC_E_INCOMPLETE_MESSAGE (0x80090318)
+        while (status == 0x00090312 || status == 0x80090318) {
+            if (status == 0x80090318 || in_len == 0u) {
+                var bytes_read_opt = fd.receive(&in_data[in_len], 32768u - in_len);
+                if (bytes_read_opt.is_none()) {
+                    status = 0xFFFFFFFF; // Force error
+                    break;
+                }
+
+                var bytes_read = bytes_read_opt.unwrap();
+                if (bytes_read == 0u) {
+                    status = 0xFFFFFFFF; // Force error
+                    break;
+                }
+
+                in_len += bytes_read as u32;
+            }
+
+            var in_bufs: [2]SecBuffer;
+            in_bufs[0] = SecBuffer { cbBuffer: in_len, BufferType: 2u, pvBuffer: in_data }; // SECBUFFER_TOKEN
+            in_bufs[1] = SecBuffer { cbBuffer: 0u, BufferType: 0u, pvBuffer: null }; // SECBUFFER_EMPTY
+            var in_desc = SecBufferDesc { ulVersion: 0u, cBuffers: 2u, pBuffers: &in_bufs as *SecBuffer };
+
+            out_buf = SecBuffer { cbBuffer: 0u, BufferType: 2u, pvBuffer: null };
+            out_desc = SecBufferDesc { ulVersion: 0u, cBuffers: 1u, pBuffers: &out_buf };
+
+            status = InitializeSecurityContextA(&cred, &ctx, target, req_flags, 0u, 0u, &in_desc, 0u, &ctx, &out_desc, &ctx_flags, null) as u32;
+
+            if (out_buf.cbBuffer > 0u) {
+                fd.send(out_buf.pvBuffer, out_buf.cbBuffer);
+                FreeContextBuffer(out_buf.pvBuffer);
+            }
+
+            if (status == 0x80090318) continue; // Incomplete message, read more data from socket
+
+            if (status != 0x00090312 && status != 0u) break; // Error handling
+
+            // Handle any extra trailing data correctly (e.g. combined TLS handshake frames)
+            if (in_bufs[1].BufferType == 5u) { // SECBUFFER_EXTRA
+                var extra_len = in_bufs[1].cbBuffer;
+                var offset = in_len - extra_len;
+                for (var i = 0u; i < extra_len; i++) {
+                    in_data[i] = in_data[offset + i];
+                }
+                in_len = extra_len;
+            } else {
+                in_len = 0u;
+            }
+        }
+
+        free(target);
+
+        if (status != 0u) { // SEC_E_OK
+            free(in_data);
+            DeleteSecurityContext(&ctx);
+            FreeCredentialsHandle(&cred);
+            fd.close();
+            return Option:[Self]::none();
+        }
+
+        // Get Stream sizing requirements for buffering payload encryption loops
+        QueryContextAttributesA(&ctx, 4u, &sizes); // 4 = SECPKG_ATTR_STREAM_SIZES
+
+        return Self {
+            fd: fd,
+            cred: cred,
+            ctx: ctx,
+            sizes: sizes,
+            in_data: in_data,
+            in_len: 0u,
+            dec_data: malloc(32768u) as mut* u8,
+            dec_len: 0u,
+            dec_offset: 0u,
+            out_data: malloc(32768u) as mut* u8,
+        };
+    }
+
+    pub func is_open(self) bool {
+        return self.fd.is_open();
+    }
+
+    pub func receive(mut self, buffer: mut* void, size: u64) ?u64 {
+        // Drain already decrypted data first
+        if (self.dec_len > 0u) {
+            var to_copy = self.dec_len;
+            if (to_copy > size as u32) to_copy = size as u32;
+
+            var dst = buffer as mut* u8;
+            var src = &self.dec_data[self.dec_offset] as *u8;
+            for (var i = 0u; i < to_copy; i++) {
+                dst[i] = src[i];
+            }
+
+            self.dec_len -= to_copy;
+            self.dec_offset += to_copy;
+            return to_copy as u64;
+        }
+
+        while (true) {
+            var dec_bufs: [4]SecBuffer;
+            dec_bufs[0] = SecBuffer { cbBuffer: self.in_len, BufferType: 1u, pvBuffer: self.in_data };
+            dec_bufs[1] = SecBuffer { cbBuffer: 0u, BufferType: 0u, pvBuffer: null };
+            dec_bufs[2] = SecBuffer { cbBuffer: 0u, BufferType: 0u, pvBuffer: null };
+            dec_bufs[3] = SecBuffer { cbBuffer: 0u, BufferType: 0u, pvBuffer: null };
+            var dec_desc = SecBufferDesc { ulVersion: 0u, cBuffers: 4u, pBuffers: &dec_bufs as *SecBuffer };
+
+            var status = DecryptMessage(&self.ctx, &dec_desc, 0u, null) as u32;
+
+            if (status == 0x80090318) { // SEC_E_INCOMPLETE_MESSAGE
+                var bytes_read = self.fd.receive(&self.in_data[self.in_len], 32768u - self.in_len)?;
+                if (bytes_read == 0u) return 0u;
+                self.in_len += bytes_read as u32;
+                continue;
+            }
+
+            if (status == 0u) { // SEC_E_OK
+                var data_idx: i32 = -1;
+                var extra_idx: i32 = -1;
+                for (var i = 0u; i < 4u; i++) {
+                    if (dec_bufs[i].BufferType == 1u) data_idx = i as i32; // SECBUFFER_DATA
+                    if (dec_bufs[i].BufferType == 5u) extra_idx = i as i32; // SECBUFFER_EXTRA
+                }
+
+                if (data_idx >= 0) {
+                    var data_buf = dec_bufs[data_idx as u32];
+                    var src = data_buf.pvBuffer as *u8;
+                    for (var i = 0u; i < data_buf.cbBuffer; i++) {
+                        self.dec_data[i] = src[i];
+                    }
+                    self.dec_len = data_buf.cbBuffer;
+                    self.dec_offset = 0u;
+                }
+
+                // Preserve untouched encrypted frames left at the tail for the next decryption loop
+                if (extra_idx >= 0) {
+                    var extra_buf = dec_bufs[extra_idx as u32];
+                    var extra_len = extra_buf.cbBuffer;
+                    var offset = self.in_len - extra_len;
+                    for (var i = 0u; i < extra_len; i++) {
+                        self.in_data[i] = self.in_data[offset + i];
+                    }
+                    self.in_len = extra_len;
+                } else {
+                    self.in_len = 0u;
+                }
+
+                if (self.dec_len == 0u) {
+                    continue;
+                }
+
+                break;
+            }
+
+            if (status == 0x00090317) { // SEC_I_CONTEXT_EXPIRED
+                return 0u; // Graceful EOF
+            }
+
+            return Option:[u64]::none(); // Fatal error or unhandled renegotiation (SEC_I_RENEGOTIATE)
+        }
+
+        // Loop execution drops here once valid data has been decoded.
+        // Restart via recursion to trigger the drain block at the start of this function
+        return self.receive(buffer, size);
+    }
+
+    pub func send(mut self, data: *void, size: u64) ?u64 {
+        // TLS fragments payload at a max length (typically 16k byte blocks)
+        if (size > self.sizes.cbMaximumMessage as u64) {
+            size = self.sizes.cbMaximumMessage as u64;
+        }
+
+        var src = data as *u8;
+        for (var i = 0u; i < size as u32; i++) {
+            self.out_data[self.sizes.cbHeader + i] = src[i];
+        }
+
+        // Map regions inside the constructed outgoing buffer so SChannel encrypts in-place seamlessly
+        var enc_bufs: [4]SecBuffer;
+        enc_bufs[0] = SecBuffer { cbBuffer: self.sizes.cbHeader, BufferType: 7u, pvBuffer: &self.out_data[0] };
+        enc_bufs[1] = SecBuffer { cbBuffer: size as u32, BufferType: 1u, pvBuffer: &self.out_data[self.sizes.cbHeader] };
+        enc_bufs[2] = SecBuffer { cbBuffer: self.sizes.cbTrailer, BufferType: 6u, pvBuffer: &self.out_data[self.sizes.cbHeader + (size as u32)] };
+        enc_bufs[3] = SecBuffer { cbBuffer: 0u, BufferType: 0u, pvBuffer: null };
+
+        var enc_desc = SecBufferDesc { ulVersion: 0u, cBuffers: 4u, pBuffers: &enc_bufs as *SecBuffer };
+
+        var status = EncryptMessage(&self.ctx, 0u, &enc_desc, 0u);
+        if (status != 0) return Option:[u64]::none();
+
+        var to_send = enc_bufs[0].cbBuffer + enc_bufs[1].cbBuffer + enc_bufs[2].cbBuffer;
+        var data = self.out_data;
+
+        while (to_send > 0u) {
+            var sent = self.fd.send(self.out_data, to_send)?;
+            if (sent <= 0u) return Option:[u64]::none();
+
+            to_send -= sent as u32;
+            data = &data[sent];
+        }
+
+        return size;
+    }
+
+    pub func close(mut self) {
+        free(self.in_data);
+        self.in_data = null;
+
+        free(self.dec_data);
+        self.dec_data = null;
+
+        free(self.out_data);
+        self.out_data = null;
+
+        DeleteSecurityContext(&self.ctx);
+        FreeCredentialsHandle(&self.cred);
+
+        self.fd.close();
+    }
+}

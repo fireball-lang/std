@@ -1,0 +1,41 @@
+mod std::net::http;
+
+import std::net::{TlsSocket, Socket};
+import std::io::{Reader, Writer};
+
+struct HttpSocket {
+    is_tls: bool,
+    tls: TlsSocket,
+    normal: Socket,
+}
+
+impl HttpSocket {
+    func write_str(mut self, str: StringView) {
+        self.write(str.ptr, str.size);
+    }
+
+    func close(mut self) {
+        if (self.is_tls) self.tls.close();
+        else self.normal.close();
+    }
+}
+
+impl HttpSocket : Reader {
+    func read(mut self, buffer: mut* void, size: u64) ?u64 {
+        if (self.is_tls) {
+            return self.tls.read(buffer, size);
+        }
+
+        return self.normal.read(buffer, size);
+    }
+}
+
+impl HttpSocket : Writer {
+    func write(mut self, data: *void, size: u64) ?u64 {
+        if (self.is_tls) {
+            return self.tls.write(data, size);
+        }
+
+        return self.normal.write(data, size);
+    }
+}

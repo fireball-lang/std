@@ -1,0 +1,45 @@
+mod std::net;
+
+import std::io::{Reader, Writer};
+
+#[cfg(target_family = "windows")]
+import std::net::windows as imp;
+#[cfg(target_family = "unix")]
+import std::net::unix as imp;
+
+pub struct TlsSocket {
+    pub ip: [4]u8,
+    pub port: u16,
+
+    imp: imp::TlsSocket,
+}
+
+impl TlsSocket {
+    pub func connect(ip: [4]u8, port: u16, hostname: StringView) ?Self {
+        return Self {
+            ip: ip,
+            port: port,
+            imp: imp::TlsSocket::connect(ip, port, hostname)?,
+        };
+    }
+
+    pub func is_open(self) bool {
+        return self.imp.is_open();
+    }
+
+    pub func close(mut self) {
+        self.imp.close();
+    }
+}
+
+impl TlsSocket : Reader {
+    pub func read(mut self, buffer: mut* void, size: u64) ?u64 {
+        return self.imp.receive(buffer, size);
+    }
+}
+
+impl TlsSocket : Writer {
+    pub func write(mut self, data: *void, size: u64) ?u64 {
+        return self.imp.send(data, size);
+    }
+}

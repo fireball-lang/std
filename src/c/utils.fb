@@ -2,6 +2,22 @@ mod std::c;
 
 import std::c::{malloc, memcpy};
 
+#[cfg(target_os = "windows")]
+#[extern, link_name("_errno")]
+func errno_raw() *i32;
+
+#[cfg(target_os = "linux")]
+#[extern, link_name("__errno_location")]
+func errno_raw() *i32;
+
+#[cfg(target_os = "macos")]
+#[extern, link_name("__error")]
+func errno_raw() *i32;
+
+pub func errno() i32 {
+    return *errno_raw();
+}
+
 pub func to_cstring(str: StringView) mut* u8 {
     var cstr = malloc(str.size + 1u) as mut* u8;
 

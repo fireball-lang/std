@@ -1,8 +1,7 @@
 mod std::net::http;
 
 import std::c::{malloc, free, memcpy, printf, exit};
-import std::net::http::{Status, HeaderMap};
-import std::net::{Socket};
+import std::net::http::{Status, HeaderMap, HttpSocket};
 import std::io::{Reader};
 
 pub struct Response {
@@ -13,11 +12,11 @@ pub struct Response {
     filled: u64,
     consumed: u64,
 
-    socket: Socket,
+    socket: HttpSocket,
 }
 
 impl Response {
-    pub func receive_from(socket: Socket) ?Self {
+    func receive_from(socket: HttpSocket) ?Self {
         var res = Response {
             buffer: malloc(8192u) as mut* u8,
             socket: socket,
@@ -78,6 +77,8 @@ impl Response {
     pub func close(mut self) {
         self.headers.free();
         free(self.buffer);
+
+        //self.socket.close();
     }
 }
 

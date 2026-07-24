@@ -1,7 +1,8 @@
 mod std::net::http;
 
-import std::net::http::{Method, Status, HeaderMap, Response};
-import std::net::{Socket, Uri, resolve_domain};
+import std::net::http::{Method, Status, HeaderMap, Response, HttpSocket};
+import std::net::{Uri, resolve_domain, Socket, TlsSocket};
+import std::io::{Writer};
 
 pub struct Request {
     pub method: Method,
@@ -47,26 +48,13 @@ impl Request {
 
     pub func send(mut self) ?Response {
         // Connect to server
-        var ips: [4][4]u8;
-        var size = resolve_domain(self.uri.authority, &ips[0], 4u);
-
-        var socket_opt: ?Socket;
-
-        for (var i = 0u; i < size && socket_opt.is_none(); i++) {
-            socket_opt = Socket::connect(ips[i], 80u);
-        }
-
-        if (socket_opt.is_none()) {
-            return Option:[Response]::none();
-        }
-
-        var socket = socket_opt.unwrap();
+        var socket = self.connect()?;
 
         // Send request line
         self.send_line(socket);
 
         // Send headers
-        self.send_header(socket, "Host", self.uri.authority);
+        self.write_header(socket, "Host", self.uri.authority);
 
         var has_user_agent = false;
         var has_accept = false;
@@ -75,18 +63,18 @@ impl Request {
             var header = self.headers.get_at(i);
 
             if (!header.key_eq("Host") && !header.key_eq("Content-Length")) {
-                self.send_header(socket, header.key, header.value);
+                self.write_header(socket, header.key, header.value);
 
                 if (header.key_eq("User-Agent")) has_user_agent = true;
                 else if (header.key_eq("Accept")) has_accept = true;
             }
         }
 
-        if (!has_user_agent) self.send_header(socket, "User-Agent", "fireball-std");
-        if (!has_accept) self.send_header(socket, "Accept", "*/*");
+        if (!has_user_agent) self.write_header(socket, "User-Agent", "fireball-std");
+        if (!has_accept) self.write_header(socket, "Accept", "*/*");
 
         socket.write_str("Content-Length: ");
-        send_u32(socket, self.body_size);
+        write_u32:[mut* HttpSocket](&socket, self.body_size);
         socket.write_str("\r\n");
 
         socket.write_str("\r\n");
@@ -98,7 +86,45 @@ impl Request {
         return Response::receive_from(socket);
     }
 
-    func send_line(mut self, socket: Socket) {
+    func connect(self) ?HttpSocket {
+        // Resolve domain
+        var ips: [4][4]u8;
+        var size = resolve_domain(self.uri.authority, &ips[0], 4u);
+
+        // HTTP
+        if (self.uri.scheme.eq("http")) {
+            var socket_opt: ?Socket;
+
+            for (var i = 0u; i < size && socket_opt.is_none(); i++) {
+                socket_opt = Socket::connect(ips[i], 80u);
+            }
+
+            return HttpSocket {
+                is_tls: false,
+                normal: socket_opt?,
+            };
+        }
+
+        // HTTPS
+        if (self.uri.scheme.eq("https")) {
+            var socket_opt: ?TlsSocket;
+
+            for (var i = 0u; i < size && socket_opt.is_none(); i++) {
+                socket_opt = TlsSocket::connect(ips[i], 443u, self.uri.authority);
+            }
+
+            return HttpSocket {
+                is_tls: true,
+                tls: socket_opt?,
+            };
+        }
+
+        // Invalid
+        panic("invalid URL scheme for HTTP request");
+        return Option:[HttpSocket]::none();
+    }
+
+    func send_line(mut self, socket: HttpSocket) {
         socket.write_str(self.method.string());
         socket.write_str(" ");
 
@@ -121,7 +147,7 @@ impl Request {
         socket.write_str(" HTTP/1.0\r\n");
     }
 
-    func send_header(mut self, socket: Socket, key: StringView, value: StringView) {
+    func write_header(mut self, socket: HttpSocket, key: StringView, value: StringView) {
         socket.write_str(key);
         socket.write_str(": ");
         socket.write_str(value);
@@ -133,7 +159,7 @@ impl Request {
     }
 }
 
-func send_u32(socket: Socket, num: u32) {
+func write_u32[T: mut Writer](writer: T, num: u32) {
     var buffer: [16]u8;
     var len = 0u;
 
@@ -150,8 +176,5 @@ func send_u32(socket: Socket, num: u32) {
         buffer[len - i - 1u] = temp;
     }
 
-    socket.write_str(StringView {
-        ptr: &buffer[0],
-        size: len,
-    });
+    writer.write(&buffer[0], len);
 }

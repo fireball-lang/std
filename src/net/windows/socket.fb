@@ -155,7 +155,7 @@ impl SocketFd {
     }
 
     pub func send(mut self, data: *void, size: u64) ?u64 {
-        if (size > 2_147_483_647u) panic("SocketFd.send() - size too big");
+        if (size > 2_147_483_647u) size = 2_147_483_647u;
 
         // Send
         if (size == 0u) return 0u;
@@ -171,7 +171,7 @@ impl SocketFd {
     }
 
     pub func receive(mut self, buffer: mut* void, size: u64) ?u64 {
-        if (size > 2_147_483_647u) panic("SocketFd.send() - size too big");
+        if (size > 2_147_483_647u) size = 2_147_483_647u;
 
         // Receive
         if (size == 0u) return 0u;
