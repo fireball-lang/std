@@ -43,7 +43,7 @@ impl[K: Eq, V] ArrayMap[K, V] {
 
     pub func contains(self, key: K) bool {
         for (var i = 0u; i < self.items.size(); i++) {
-            if (self.items.get(i).key.eq(key)) {
+            if (self.items[i].key.eq(key)) {
                 return true;
             }
         }
@@ -71,10 +71,21 @@ impl[K: Eq, V] ArrayMap[K, V] {
     }
 
     pub func get_at(self, index: u32) Item[K, V] {
-        return self.items.get(index);
+        return self.items[index];
     }
 
     pub func free(mut self) {
         self.items.free();
+    }
+}
+
+impl[K: Eq, V] ArrayMap[K, V] : Index[K] {
+    type Result = V;
+
+    pub func index(self, i: K) V {
+        var value: V;
+        if (!self.try_get(i, &value)) panic("ArrayMap::[] - value not found");
+
+        return value;
     }
 }

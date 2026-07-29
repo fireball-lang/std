@@ -63,7 +63,7 @@ impl Response {
     }
 
     func parse_header(mut self, line: StringView) {
-        var colon = line.index(":");
+        var colon = line.index_of(":");
         if (colon < 0) return;
 
         var key = line.slice(0u, colon as u32).trim();
@@ -78,7 +78,7 @@ impl Response {
         self.headers.free();
         free(self.buffer);
 
-        //self.socket.close();
+        self.socket.close();
     }
 }
 

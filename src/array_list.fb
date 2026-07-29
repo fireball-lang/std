@@ -48,10 +48,6 @@ impl[T] ArrayList[T] {
         return self.size;
     }
 
-    pub func get(self, index: u32) T {
-        return self.ptr[index];
-    }
-
     pub func get_ptr(mut self, index: u32) mut* T {
         return &self.ptr[index];
     }
@@ -64,5 +60,13 @@ impl[T] ArrayList[T] {
         self.ptr = null;
         self.size = 0u;
         self.capacity = 0u;
+    }
+}
+
+impl[T] ArrayList[T] : Index[u32] {
+    type Result = T;
+
+    pub func index(self, i: u32) T {
+        return self.ptr[i];
     }
 }

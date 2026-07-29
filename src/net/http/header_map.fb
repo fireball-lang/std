@@ -56,7 +56,7 @@ impl HeaderMap {
 
     pub func contains(self, key: StringView) bool {
         for (var i = 0u; i < self.headers.size(); i++) {
-            if (case_insensitive_eq(self.headers.get(i).key, key)) {
+            if (case_insensitive_eq(self.headers[i].key, key)) {
                 return true;
             }
         }
@@ -83,11 +83,22 @@ impl HeaderMap {
     }
 
     pub func get_at(self, index: u32) Header {
-        return self.headers.get(index);
+        return self.headers[index];
     }
 
     pub func free(mut self) {
         self.headers.free();
+    }
+}
+
+impl HeaderMap : Index[StringView] {
+    type Result = StringView;
+
+    pub func index(self, i: StringView) StringView {
+        var value: StringView;
+        if (!self.try_get(i, &value)) panic("ArrayMap::[] - value not found");
+
+        return value;
     }
 }
 

@@ -14,7 +14,7 @@ impl Uri {
         var remaining = str;
 
         // 1. Extract the fragment (everything after the first '#')
-        var hash_idx = remaining.index("#");
+        var hash_idx = remaining.index_of("#");
         if (hash_idx != -1) {
             var idx = (hash_idx as u32);
             result.fragment = remaining.slice(idx + 1u, remaining.size);
@@ -22,7 +22,7 @@ impl Uri {
         }
 
         // 2. Extract the query (everything after the first '?' in the remaining part)
-        var query_idx = remaining.index("?");
+        var query_idx = remaining.index_of("?");
         if (query_idx != -1) {
             var idx = (query_idx as u32);
             result.query = remaining.slice(idx + 1u, remaining.size);
@@ -30,8 +30,8 @@ impl Uri {
         }
 
         // 3. Extract the scheme (must be before the first '/' if it exists)
-        var colon_idx = remaining.index(":");
-        var slash_idx = remaining.index("/");
+        var colon_idx = remaining.index_of(":");
+        var slash_idx = remaining.index_of("/");
 
         if (colon_idx != -1 && (slash_idx == -1 || colon_idx < slash_idx)) {
             var idx = (colon_idx as u32);
@@ -43,7 +43,7 @@ impl Uri {
         if (remaining.starts_with("//")) {
             remaining = remaining.slice(2u, remaining.size);
 
-            var auth_slash_idx = remaining.index("/");
+            var auth_slash_idx = remaining.index_of("/");
             if (auth_slash_idx != -1) {
                 var idx = (auth_slash_idx as u32);
                 result.authority = remaining.slice(0u, idx);
