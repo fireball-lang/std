@@ -1,0 +1,40 @@
+mod std::os;
+
+#[cfg(target_family = "windows")]
+import std::os::windows::{Fd};
+#[cfg(target_family = "unix")]
+import std::os::unix::{Fd};
+
+import std::io::{Reader, Writer};
+import std::os::{File};
+
+var stdin_file: File;
+var stdout_file: File;
+var stderr_file: File;
+
+var stdio_initialised: bool;
+
+func ensure_stdio_initialized() {
+    if (stdio_initialised) return;
+
+    stdin_file = File::from_fd(Fd::stdin());
+    stdout_file = File::from_fd(Fd::stdout());
+    stderr_file = File::from_fd(Fd::stderr());
+
+    stdio_initialised = true;
+}
+
+pub func stdin() mut Reader {
+    ensure_stdio_initialized();
+    return &stdin_file;
+}
+
+pub func stdout() mut Writer {
+    ensure_stdio_initialized();
+    return &stdout_file;
+}
+
+pub func stderr() mut Writer {
+    ensure_stdio_initialized();
+    return &stderr_file;
+}

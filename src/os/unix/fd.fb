@@ -1,0 +1,114 @@
+#[cfg(target_family = "unix")]
+
+mod std::os::unix;
+
+import std::c::{to_cstring, free};
+import std::os::{Seek};
+
+// Bindings
+
+#[cfg(target_os = "linux")]
+enum Flags : i32 {
+    ReadOnly = 0,
+    WriteOnly = 1,
+    Create = 64,
+    Truncate = 512,
+    CloseOnExec = 524288,
+}
+
+#[cfg(target_os = "linux")]
+func at_fdcwd() i32 {
+    return -100;
+}
+
+#[cfg(target_os = "macos")]
+enum Flags : i32 {
+    ReadOnly = 0,
+    WriteOnly = 1,
+    Create = 512,
+    Truncate = 1024,
+    CloseOnExec = 16777216,
+}
+
+#[cfg(target_os = "macos")]
+func at_fdcwd() i32 {
+    return -2;
+}
+
+#[extern]
+func openat(fd: i32, path: *u8, flags: i32, mode: i32) i32;
+
+#[extern]
+func close(fd: i32) i32;
+
+#[extern]
+func lseek(fd: i32, offset: i64, whence: i32) i64;
+
+#[extern]
+func read(fd: i32, buffer: mut* void, size: u64) i64;
+
+#[extern]
+func write(fd: i32, data: *void, size: u64) i64;
+
+// Fd
+
+pub struct Fd {
+    handle: i32,
+}
+
+impl Fd {
+    pub func create(path: StringView) ?Fd {
+        var path_c = to_cstring(path);
+        var handle = openat(at_fdcwd(), path_c, Flags::Create as i32 | Flags::Truncate as i32 | Flags::WriteOnly as i32 | Flags::CloseOnExec as i32, 438);
+        free(path_c);
+
+        if (handle < 0) return Option:[Fd]::none();
+        return Fd { handle: handle };
+    }
+
+    pub func open(path: StringView) ?Fd {
+        var path_c = to_cstring(path);
+        var handle = openat(at_fdcwd(), path_c, Flags::ReadOnly as i32 | Flags::CloseOnExec as i32, 0);
+        free(path_c);
+
+        if (handle < 0) return Option:[Fd]::none();
+        return Fd { handle: handle };
+    }
+
+    pub func stdin() Fd {
+        return Fd { handle: 0 };
+    }
+
+    pub func stdout() Fd {
+        return Fd { handle: 1 };
+    }
+
+    pub func stderr() Fd {
+        return Fd { handle: 2 };
+    }
+
+    pub func close(mut self) {
+        close(self.handle);
+    }
+
+    pub func seek(mut self, mode: Seek, offset: i64) ?u64 {
+        var position = lseek(self.handle, offset, mode as i32);
+        if (position < 0) return Option:[u64]::none();
+
+        return position as u64;
+    }
+
+    pub func read(mut self, buffer: mut []u8) ?u64 {
+        var read = read(self.handle, buffer.ptr, buffer.size);
+        if (read < 0) return Option:[u64]::none();
+
+        return read as u64;
+    }
+
+    pub func write(mut self, data: []u8) ?u64 {
+        var written = write(self.handle, data.ptr, data.size);
+        if (written < 0) return Option:[u64]::none();
+
+        return written as u64;
+    }
+}

@@ -1,6 +1,7 @@
 mod std;
 
-import std::c::{printf, exit};
+import std::os::{stderr};
+import std::c::{exit};
 
 #[init]
 func init_panic() {
@@ -8,6 +9,11 @@ func init_panic() {
 }
 
 func panic_handler(msg: StringView) {
-    printf("panic: %.*s\n".ptr, msg.size, msg.ptr);
+    var w = stderr();
+
+    w.write("panic: ");
+    w.write(msg);
+    w.write("\n");
+
     exit(1);
 }

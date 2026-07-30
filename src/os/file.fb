@@ -1,82 +1,73 @@
 mod std::os;
 
+#[cfg(target_family = "windows")]
+import std::os::windows::{Fd};
+#[cfg(target_family = "unix")]
+import std::os::unix::{Fd};
+
 import std::io::{Reader, Writer};
-import std::c;
+
+pub enum Seek {
+    Start = 0,
+    Current = 1,
+    End = 2,
+}
 
 pub struct File {
-    fd: *c::File,
+    fd: Fd,
+    open: bool,
 }
 
 impl File {
     pub func create(path: StringView) ?Self {
-        return Self::open_raw(path, "w");
-    }
-
-    pub func open(path: StringView) ?Self {
-        return Self::open_raw(path, "r");
-    }
-
-    func open_raw(path: StringView, mode: StringView) ?Self {
-        // Open FD
-        var c_path = c::to_cstring(path);
-        var fd = c::fopen(c_path, mode.ptr);
-        c::free(c_path);
-
-        if (fd == null) return Option:[Self]::none();
-
-        // Create File
         return File {
-            fd: fd,
+            fd: Fd::create(path)?,
+            open: true,
         };
     }
 
+    pub func open(path: StringView) ?Self {
+        return File {
+            fd: Fd::open(path)?,
+            open: true,
+        };
+    }
+
+    pub func from_fd(fd: Fd) Self {
+        return File {
+            fd: fd,
+            open: true,
+        };
+    }
+
+    pub func seek(mut self, mode: Seek, offset: i64) ?u64 {
+        return self.fd.seek(mode, offset);
+    }
+
+    pub func size(mut self) ?u64 {
+        var position = self.fd.seek(Seek::Current, 0)?;
+        var size = self.fd.seek(Seek::End, 0)?;
+        self.fd.seek(Seek::Start, position as i64)?;
+
+        return size;
+    }
+
     pub func close(mut self) {
-        if (self.fd == null) panic("tried to close an already closed file");
+        if (!self.open) panic("tried to close an already closed file");
 
-        c::fclose(self.fd);
-
-        self.fd = null;
+        self.fd.close();
+        self.open = false;
     }
 }
 
 impl File : Reader {
     pub func read(mut self, buffer: mut []u8) ?u64 {
-        // Read
-        if (buffer.size == 0u) return 0u;
-        var read = c::fread(buffer.ptr, 1u, buffer.size, self.fd);
-
-        // Some amount of bytes read
-        if (read > 0u) {
-            return read;
-        }
-
-        // Error
-        if (buffer.size > 0u && c::ferror(self.fd) != 0) {
-            return Option:[u64]::none();
-        }
-
-        // EOF
-        return 0u;
+        return self.fd.read(buffer);
     }
 }
 
 impl File : Writer {
     pub func write(mut self, data: []u8) ?u64 {
-        // Write
-        if (data.size == 0u) return 0u;
-        var written = c::fwrite(data.ptr, 1u, data.size, self.fd);
-
-        // Some amount of bytes written
-        if (written > 0u) {
-            return written;
-        }
-
-        // Error
-        if (data.size > 0u && c::ferror(self.fd) != 0) {
-            return Option:[u64]::none();
-        }
-
-        // Called with 0 size
-        return 0u;
+        return self.fd.write(data);
     }
 }
