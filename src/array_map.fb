@@ -66,11 +66,11 @@ impl[K: Eq, V] ArrayMap[K, V] {
         return empty;
     }
 
-    pub func size(self) u32 {
+    pub func size(self) u64 {
         return self.items.size();
     }
 
-    pub func get_at(self, index: u32) Item[K, V] {
+    pub func get_at(self, index: u64) Item[K, V] {
         return self.items[index];
     }
 

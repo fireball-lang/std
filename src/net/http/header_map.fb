@@ -78,7 +78,7 @@ impl HeaderMap {
         return "";
     }
 
-    pub func size(self) u32 {
+    pub func size(self) u64 {
         return self.headers.size();
     }
 

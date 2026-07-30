@@ -4,12 +4,12 @@ import std::c::{malloc, free, memcpy, memmove};
 
 pub struct ArrayList[T] {
     ptr: mut *T,
-    size: u32,
-    capacity: u32,
+    size: u64,
+    capacity: u64,
 }
 
 impl[T] ArrayList[T] {
-    pub func ensure_capacity(mut self, additional_size: u32) {
+    pub func ensure_capacity(mut self, additional_size: u64) {
         if (self.size + additional_size <= self.capacity) return;
 
         var new_capacity = self.capacity * 2u;
@@ -32,23 +32,23 @@ impl[T] ArrayList[T] {
         self.ptr[self.size++] = item;
     }
 
-    pub func add_all(mut self, items: *T, count: u32) {
-        self.ensure_capacity(count);
+    pub func add_all(mut self, items: []T) {
+        self.ensure_capacity(items.size);
 
-        memcpy(&self.ptr[self.size], items, count * sizeof(T));
-        self.size += count;
+        memcpy(&self.ptr[self.size], items.ptr, items.size * sizeof(T));
+        self.size += items.size;
     }
 
-    pub func remove(mut self, index: u32) {
+    pub func remove(mut self, index: u64) {
         memmove(&self.ptr[index], &self.ptr[index + 1u], (self.size - index - 1u) * sizeof(T));
         self.size--;
     }
 
-    pub func size(self) u32 {
+    pub func size(self) u64 {
         return self.size;
     }
 
-    pub func get_ptr(mut self, index: u32) mut* T {
+    pub func get_ptr(mut self, index: u64) mut* T {
         return &self.ptr[index];
     }
 
@@ -67,10 +67,10 @@ impl[T] ArrayList[T] {
     }
 }
 
-impl[T] ArrayList[T] : Index[u32] {
+impl[T] ArrayList[T] : Index[u64] {
     type Result = T;
 
-    pub func index(self, i: u32) T {
+    pub func index(self, i: u64) T {
         return self.ptr[i];
     }
 }
