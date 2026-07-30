@@ -10,10 +10,6 @@ struct HttpSocket {
 }
 
 impl HttpSocket {
-    func write_str(mut self, str: StringView) {
-        self.write(str.ptr, str.size);
-    }
-
     func close(mut self) {
         if (self.is_tls) self.tls.close();
         else self.normal.close();
@@ -21,21 +17,21 @@ impl HttpSocket {
 }
 
 impl HttpSocket : Reader {
-    func read(mut self, buffer: mut* void, size: u64) ?u64 {
+    func read(mut self, buffer: mut []u8) ?u64 {
         if (self.is_tls) {
-            return self.tls.read(buffer, size);
+            return self.tls.read(buffer);
         }
 
-        return self.normal.read(buffer, size);
+        return self.normal.read(buffer);
     }
 }
 
 impl HttpSocket : Writer {
-    func write(mut self, data: *void, size: u64) ?u64 {
+    func write(mut self, data: []u8) ?u64 {
         if (self.is_tls) {
-            return self.tls.write(data, size);
+            return self.tls.write(data);
         }
 
-        return self.normal.write(data, size);
+        return self.normal.write(data);
     }
 }

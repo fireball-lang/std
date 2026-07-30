@@ -33,13 +33,13 @@ impl TlsSocket {
 }
 
 impl TlsSocket : Reader {
-    pub func read(mut self, buffer: mut* void, size: u64) ?u64 {
-        return self.imp.receive(buffer, size);
+    pub func read(mut self, buffer: mut []u8) ?u64 {
+        return self.imp.receive(buffer);
     }
 }
 
 impl TlsSocket : Writer {
-    pub func write(mut self, data: *void, size: u64) ?u64 {
-        return self.imp.send(data, size);
+    pub func write(mut self, data: []u8) ?u64 {
+        return self.imp.send(data);
     }
 }

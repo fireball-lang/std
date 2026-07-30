@@ -154,12 +154,12 @@ impl SocketFd {
         return Self { fd: fd };
     }
 
-    pub func send(mut self, data: *void, size: u64) ?u64 {
-        if (size > 2_147_483_647u) size = 2_147_483_647u;
+    pub func send(mut self, data: []u8) ?u64 {
+        if (data.size > 2_147_483_647u) data = data.slice(0u, 2_147_483_647u);
 
         // Send
-        if (size == 0u) return 0u;
-        var sent = send(self.fd, data, size as i32, 0);
+        if (data.size == 0u) return 0u;
+        var sent = send(self.fd, data.ptr, data.size as i32, 0);
 
         // Some amount of bytes sent
         if (sent > 0) {
@@ -170,12 +170,12 @@ impl SocketFd {
         return Option:[u64]::none();
     }
 
-    pub func receive(mut self, buffer: mut* void, size: u64) ?u64 {
-        if (size > 2_147_483_647u) size = 2_147_483_647u;
+    pub func receive(mut self, buffer: mut []u8) ?u64 {
+        if (buffer.size > 2_147_483_647u) buffer = buffer.slice(0u, 2_147_483_647u);
 
         // Receive
-        if (size == 0u) return 0u;
-        var read = recv(self.fd, buffer, size as i32, 0);
+        if (buffer.size == 0u) return 0u;
+        var read = recv(self.fd, buffer.ptr, buffer.size as i32, 0);
 
         // Some amount of bytes read
         if (read > 0) {

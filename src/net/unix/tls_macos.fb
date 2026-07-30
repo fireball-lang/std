@@ -134,27 +134,27 @@ impl TlsSocket {
         return self.fd.is_open();
     }
 
-    pub func receive(mut self, buffer: mut* void, size: u64) ?u64 {
-        if (size > 2_147_483_647u) size = 2_147_483_647u;
+    pub func send(mut self, data: []u8) ?u64 {
+        if (data.size > 2_147_483_647u) data = data.slice(0u, 2_147_483_647u);
 
         var processed: u64 = 0u;
-        var result = SSLRead(self.ctx, buffer, size, &processed);
-
-        if (result == -9802) {
-            // errSSLClosedGraceful (0 bytes returned by network read usually)
-            return processed;
-        }
+        var result = SSLWrite(self.ctx, data.ptr, data.size, &processed);
 
         if (result != 0 && processed == 0u) return Option:[u64]::none();
 
         return processed;
     }
 
-    pub func send(mut self, data: *void, size: u64) ?u64 {
-        if (size > 2_147_483_647u) size = 2_147_483_647u;
+    pub func receive(mut self, buffer: mut []u8) ?u64 {
+        if (buffer.size > 2_147_483_647u) buffer = buffer.slice(0u, 2_147_483_647u);
 
         var processed: u64 = 0u;
-        var result = SSLWrite(self.ctx, data, size, &processed);
+        var result = SSLRead(self.ctx, buffer.ptr, buffer.size, &processed);
+
+        if (result == -9802) {
+            // errSSLClosedGraceful (0 bytes returned by network read usually)
+            return processed;
+        }
 
         if (result != 0 && processed == 0u) return Option:[u64]::none();
 

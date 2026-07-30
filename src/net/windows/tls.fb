@@ -109,7 +109,7 @@ impl TlsSocket {
         status = InitializeSecurityContextA(&cred, null, target, req_flags, 0u, 0u, null, 0u, &ctx, &out_desc, &ctx_flags, null) as u32;
 
         if (out_buf.cbBuffer > 0u) {
-            fd.send(out_buf.pvBuffer, out_buf.cbBuffer);
+            fd.send(Slice:[u8] { ptr: out_buf.pvBuffer as *u8, size: out_buf.cbBuffer });
             FreeContextBuffer(out_buf.pvBuffer);
         }
 
@@ -119,7 +119,7 @@ impl TlsSocket {
         // SEC_I_CONTINUE_NEEDED (0x00090312) or SEC_E_INCOMPLETE_MESSAGE (0x80090318)
         while (status == 0x00090312 || status == 0x80090318) {
             if (status == 0x80090318 || in_len == 0u) {
-                var bytes_read_opt = fd.receive(&in_data[in_len], 32768u - in_len);
+                var bytes_read_opt = fd.receive(MutSlice:[u8] { ptr: &in_data[in_len], size: 32768u - in_len });
                 if (bytes_read_opt.is_none()) {
                     status = 0xFFFFFFFF; // Force error
                     break;
@@ -145,7 +145,7 @@ impl TlsSocket {
             status = InitializeSecurityContextA(&cred, &ctx, target, req_flags, 0u, 0u, &in_desc, 0u, &ctx, &out_desc, &ctx_flags, null) as u32;
 
             if (out_buf.cbBuffer > 0u) {
-                fd.send(out_buf.pvBuffer, out_buf.cbBuffer);
+                fd.send(Slice:[u8] { ptr: out_buf.pvBuffer as *u8, size: out_buf.cbBuffer });
                 FreeContextBuffer(out_buf.pvBuffer);
             }
 
@@ -197,16 +197,15 @@ impl TlsSocket {
         return self.fd.is_open();
     }
 
-    pub func receive(mut self, buffer: mut* void, size: u64) ?u64 {
+    pub func receive(mut self, buffer: mut []u8) ?u64 {
         // Drain already decrypted data first
         if (self.dec_len > 0u) {
             var to_copy = self.dec_len;
-            if (to_copy > size as u32) to_copy = size as u32;
+            if (to_copy > buffer.size as u32) to_copy = buffer.size as u32;
 
-            var dst = buffer as mut* u8;
             var src = &self.dec_data[self.dec_offset] as *u8;
             for (var i = 0u; i < to_copy; i++) {
-                dst[i] = src[i];
+                buffer.ptr[i] = src[i];
             }
 
             self.dec_len -= to_copy;
@@ -225,7 +224,7 @@ impl TlsSocket {
             var status = DecryptMessage(&self.ctx, &dec_desc, 0u, null) as u32;
 
             if (status == 0x80090318) { // SEC_E_INCOMPLETE_MESSAGE
-                var bytes_read = self.fd.receive(&self.in_data[self.in_len], 32768u - self.in_len)?;
+                var bytes_read = self.fd.receive(MutSlice:[u8] { ptr: &self.in_data[self.in_len], size: 32768u - self.in_len })?;
                 if (bytes_read == 0u) return 0u;
                 self.in_len += bytes_read as u32;
                 continue;
@@ -278,25 +277,24 @@ impl TlsSocket {
 
         // Loop execution drops here once valid data has been decoded.
         // Restart via recursion to trigger the drain block at the start of this function
-        return self.receive(buffer, size);
+        return self.receive(buffer);
     }
 
-    pub func send(mut self, data: *void, size: u64) ?u64 {
+    pub func send(mut self, data: []u8) ?u64 {
         // TLS fragments payload at a max length (typically 16k byte blocks)
-        if (size > self.sizes.cbMaximumMessage as u64) {
-            size = self.sizes.cbMaximumMessage as u64;
+        if (data.size > self.sizes.cbMaximumMessage) {
+            data = data.slice(0u, self.sizes.cbMaximumMessage);
         }
 
-        var src = data as *u8;
-        for (var i = 0u; i < size as u32; i++) {
-            self.out_data[self.sizes.cbHeader + i] = src[i];
+        for (var i = 0u; i < data.size; i++) {
+            self.out_data[self.sizes.cbHeader + i] = data[i];
         }
 
         // Map regions inside the constructed outgoing buffer so SChannel encrypts in-place seamlessly
         var enc_bufs: [4]SecBuffer;
         enc_bufs[0] = SecBuffer { cbBuffer: self.sizes.cbHeader, BufferType: 7u, pvBuffer: &self.out_data[0] };
-        enc_bufs[1] = SecBuffer { cbBuffer: size as u32, BufferType: 1u, pvBuffer: &self.out_data[self.sizes.cbHeader] };
-        enc_bufs[2] = SecBuffer { cbBuffer: self.sizes.cbTrailer, BufferType: 6u, pvBuffer: &self.out_data[self.sizes.cbHeader + (size as u32)] };
+        enc_bufs[1] = SecBuffer { cbBuffer: data.size as u32, BufferType: 1u, pvBuffer: &self.out_data[self.sizes.cbHeader] };
+        enc_bufs[2] = SecBuffer { cbBuffer: self.sizes.cbTrailer, BufferType: 6u, pvBuffer: &self.out_data[self.sizes.cbHeader + (data.size as u32)] };
         enc_bufs[3] = SecBuffer { cbBuffer: 0u, BufferType: 0u, pvBuffer: null };
 
         var enc_desc = SecBufferDesc { ulVersion: 0u, cBuffers: 4u, pBuffers: &enc_bufs as *SecBuffer };
@@ -305,17 +303,17 @@ impl TlsSocket {
         if (status != 0) return Option:[u64]::none();
 
         var to_send = enc_bufs[0].cbBuffer + enc_bufs[1].cbBuffer + enc_bufs[2].cbBuffer;
-        var data = self.out_data;
+        var out_data = self.out_data;
 
         while (to_send > 0u) {
-            var sent = self.fd.send(self.out_data, to_send)?;
+            var sent = self.fd.send(Slice:[u8] { ptr: self.out_data, size: to_send })?;
             if (sent <= 0u) return Option:[u64]::none();
 
             to_send -= sent as u32;
-            data = &data[sent];
+            out_data = &out_data[sent];
         }
 
-        return size;
+        return data.size;
     }
 
     pub func close(mut self) {

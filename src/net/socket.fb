@@ -55,10 +55,6 @@ impl Socket {
         };
     }
 
-    pub func write_str(mut self, str: StringView) ?u64 {
-        return self.write(str.ptr, str.size);
-    }
-
     pub func close(mut self) {
         self.fd.close();
         self.open = false;
@@ -66,13 +62,13 @@ impl Socket {
 }
 
 impl Socket : Reader {
-    pub func read(mut self, buffer: mut* void, size: u64) ?u64 {
-        return self.fd.receive(buffer, size);
+    pub func read(mut self, buffer: mut []u8) ?u64 {
+        return self.fd.receive(buffer);
     }
 }
 
 impl Socket : Writer {
-    pub func write(mut self, data: *void, size: u64) ?u64 {
-        return self.fd.send(data, size);
+    pub func write(mut self, data: []u8) ?u64 {
+        return self.fd.send(data);
     }
 }

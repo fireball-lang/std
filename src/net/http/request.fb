@@ -9,8 +9,7 @@ pub struct Request {
     pub uri: Uri,
     pub headers: HeaderMap,
 
-    pub body_data: *void,
-    pub body_size: u32,
+    pub body: []u8,
 }
 
 impl Request {
@@ -28,21 +27,19 @@ impl Request {
         };
     }
 
-    pub func put(url: StringView, data: *void, size: u32) ?Self {
+    pub func put(url: StringView, body: []u8) ?Self {
         return Self {
             method: Method::PUT,
             uri: Uri::parse(url)?,
-            body_data: data,
-            body_size: size,
+            body: body,
         };
     }
 
-    pub func post(url: StringView, data: *void, size: u32) ?Self {
+    pub func post(url: StringView, body: []u8) ?Self {
         return Self {
             method: Method::POST,
             uri: Uri::parse(url)?,
-            body_data: data,
-            body_size: size,
+            body: body,
         };
     }
 
@@ -73,14 +70,14 @@ impl Request {
         if (!has_user_agent) self.write_header(socket, "User-Agent", "fireball-std");
         if (!has_accept) self.write_header(socket, "Accept", "*/*");
 
-        socket.write_str("Content-Length: ");
-        write_u32:[mut* HttpSocket](&socket, self.body_size);
-        socket.write_str("\r\n");
+        socket.write("Content-Length: ");
+        write_u64:[mut* HttpSocket](&socket, self.body.size);
+        socket.write("\r\n");
 
-        socket.write_str("\r\n");
+        socket.write("\r\n");
 
         // Send body
-        socket.write(self.body_data, self.body_size);
+        socket.write(self.body);
 
         // Receive resposne
         return Response::receive_from(socket);
@@ -89,7 +86,7 @@ impl Request {
     func connect(self) ?HttpSocket {
         // Resolve domain
         var ips: [4][4]u8;
-        var size = resolve_domain(self.uri.authority, &ips[0], 4u);
+        var size = resolve_domain(self.uri.authority, ips);
 
         // HTTP
         if (self.uri.scheme.eq("http")) {
@@ -125,33 +122,33 @@ impl Request {
     }
 
     func send_line(mut self, socket: HttpSocket) {
-        socket.write_str(self.method.string());
-        socket.write_str(" ");
+        socket.write(self.method.string());
+        socket.write(" ");
 
         if (self.uri.path.size > 0u) {
-            socket.write_str(self.uri.path);
+            socket.write(self.uri.path);
         } else {
-            socket.write_str("/");
+            socket.write("/");
         }
 
         if (self.uri.query.size > 0u) {
-            socket.write_str("?");
-            socket.write_str(self.uri.query);
+            socket.write("?");
+            socket.write(self.uri.query);
         }
 
         if (self.uri.fragment.size > 0u) {
-            socket.write_str("#");
-            socket.write_str(self.uri.fragment);
+            socket.write("#");
+            socket.write(self.uri.fragment);
         }
 
-        socket.write_str(" HTTP/1.0\r\n");
+        socket.write(" HTTP/1.0\r\n");
     }
 
     func write_header(mut self, socket: HttpSocket, key: StringView, value: StringView) {
-        socket.write_str(key);
-        socket.write_str(": ");
-        socket.write_str(value);
-        socket.write_str("\r\n");
+        socket.write(key);
+        socket.write(": ");
+        socket.write(value);
+        socket.write("\r\n");
     }
 
     pub func close(mut self) {
@@ -159,8 +156,8 @@ impl Request {
     }
 }
 
-func write_u32[T: mut Writer](writer: T, num: u32) {
-    var buffer: [16]u8;
+func write_u64[T: mut Writer](writer: T, num: u64) {
+    var buffer: [32]u8;
     var len = 0u;
 
     for (;;) {
@@ -176,5 +173,5 @@ func write_u32[T: mut Writer](writer: T, num: u32) {
         buffer[len - i - 1u] = temp;
     }
 
-    writer.write(&buffer[0], len);
+    writer.write((buffer as []u8).slice(0u, len));
 }

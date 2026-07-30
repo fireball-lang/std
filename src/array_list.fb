@@ -61,6 +61,10 @@ impl[T] ArrayList[T] {
         self.size = 0u;
         self.capacity = 0u;
     }
+
+    pub func as_mut_slice(mut self) mut []T {
+        return MutSlice:[T] { ptr: self.ptr, size: self.size };
+    }
 }
 
 impl[T] ArrayList[T] : Index[u32] {
@@ -68,5 +72,11 @@ impl[T] ArrayList[T] : Index[u32] {
 
     pub func index(self, i: u32) T {
         return self.ptr[i];
+    }
+}
+
+impl[T] ArrayList[T] : ImplicitAs[[]T] {
+    pub func implicit_as(self) []T {
+        return Slice:[T] { ptr: self.ptr, size: self.size };
     }
 }

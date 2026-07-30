@@ -8,7 +8,7 @@ pub struct Response {
     pub status: Status,
     pub headers: HeaderMap,
 
-    buffer: mut* u8,
+    buffer: mut []u8,
     filled: u64,
     consumed: u64,
 
@@ -18,7 +18,7 @@ pub struct Response {
 impl Response {
     func receive_from(socket: HttpSocket) ?Self {
         var res = Response {
-            buffer: malloc(8192u) as mut* u8,
+            buffer: MutSlice:[u8] { ptr: malloc(8192u) as mut* u8, size: 8192u },
             socket: socket,
         };
 
@@ -26,13 +26,13 @@ impl Response {
             // Read data
             var space = 8192u - res.filled;
             if (space == 0u) {
-                free(res.buffer);
+                free(res.buffer.ptr);
                 return Option:[Self]::none();
             }
 
-            var size = socket.read(&res.buffer[res.filled], space) or 0u;
+            var size = socket.read(res.buffer.slice(res.filled, space)) or 0u;
             if (size == 0u) {
-                free(res.buffer);
+                free(res.buffer.ptr);
                 return Option:[Self]::none();
             }
 
@@ -40,10 +40,10 @@ impl Response {
 
             // Parse header lines
             for (;;) {
-                var end = find_crlf(&res.buffer[res.consumed], res.filled - res.consumed);
+                var end = find_crlf(res.buffer.slice(res.consumed, res.filled - res.consumed));
                 if (end < 0) break;
 
-                var line = StringView { ptr: &res.buffer[res.consumed], size: end as u32 };
+                var line = StringView { ptr: &res.buffer.ptr[res.consumed], size: end as u32 };
                 res.consumed += end as u64 + 2u;
 
                 if (line.size == 0u) return res;
@@ -76,32 +76,32 @@ impl Response {
 
     pub func close(mut self) {
         self.headers.free();
-        free(self.buffer);
+        free(self.buffer.ptr);
 
         self.socket.close();
     }
 }
 
 impl Response : Reader {
-    pub func read(mut self, buffer: mut* void, size: u64) ?u64 {
+    pub func read(mut self, buffer: mut []u8) ?u64 {
         var available = self.filled - self.consumed;
 
         if (available > 0u) {
             var to_read = available;
-            if (to_read > size) to_read = size;
+            if (to_read > buffer.size) to_read = buffer.size;
 
-            memcpy(buffer, &self.buffer[self.consumed], to_read);
+            memcpy(buffer.ptr, &self.buffer.ptr[self.consumed], to_read);
             self.consumed += to_read;
 
             return to_read;
         }
 
-        return self.socket.read(buffer, size);
+        return self.socket.read(buffer);
     }
 }
 
-func find_crlf(buffer: *u8, size: u64) i64 {
-    for (var i = 0u; i + 1u < size; i++) {
+func find_crlf(buffer: []u8) i64 {
+    for (var i = 0u; i + 1u < buffer.size; i++) {
         if (buffer[i] == '\r' && buffer[i + 1u] == '\n') return i as i64;
     }
 

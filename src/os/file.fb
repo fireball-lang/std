@@ -40,10 +40,10 @@ impl File {
 }
 
 impl File : Reader {
-    pub func read(mut self, buffer: mut* void, size: u64) ?u64 {
+    pub func read(mut self, buffer: mut []u8) ?u64 {
         // Read
-        if (size == 0u) return 0u;
-        var read = c::fread(buffer, 1u, size, self.fd);
+        if (buffer.size == 0u) return 0u;
+        var read = c::fread(buffer.ptr, 1u, buffer.size, self.fd);
 
         // Some amount of bytes read
         if (read > 0u) {
@@ -51,7 +51,7 @@ impl File : Reader {
         }
 
         // Error
-        if (size > 0u && c::ferror(self.fd) != 0) {
+        if (buffer.size > 0u && c::ferror(self.fd) != 0) {
             return Option:[u64]::none();
         }
 
@@ -61,10 +61,10 @@ impl File : Reader {
 }
 
 impl File : Writer {
-    pub func write(mut self, data: *void, size: u64) ?u64 {
+    pub func write(mut self, data: []u8) ?u64 {
         // Write
-        if (size == 0u) return 0u;
-        var written = c::fwrite(data, 1u, size, self.fd);
+        if (data.size == 0u) return 0u;
+        var written = c::fwrite(data.ptr, 1u, data.size, self.fd);
 
         // Some amount of bytes written
         if (written > 0u) {
@@ -72,7 +72,7 @@ impl File : Writer {
         }
 
         // Error
-        if (size > 0u && c::ferror(self.fd) != 0) {
+        if (data.size > 0u && c::ferror(self.fd) != 0) {
             return Option:[u64]::none();
         }
 

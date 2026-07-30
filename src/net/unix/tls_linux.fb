@@ -113,19 +113,19 @@ impl TlsSocket {
         return self.fd.is_open();
     }
 
-    pub func receive(mut self, buffer: mut* void, size: u64) ?u64 {
-        if (size > 2_147_483_647u) size = 2_147_483_647u;
+    pub func receive(mut self, buffer: mut []u8) ?u64 {
+        if (buffer.size > 2_147_483_647u) buffer = buffer.slice(0u, 2_147_483_647u);
 
-        var result = SSL_read(self.ssl, buffer, size as i32);
+        var result = SSL_read(self.ssl, buffer.ptr, buffer.size as i32);
         if (result < 0) return Option:[u64]::none();
 
         return result as u64;
     }
 
-    pub func send(mut self, data: *void, size: u64) ?u64 {
-        if (size > 2_147_483_647u) size = 2_147_483_647u;
+    pub func send(mut self, data: []u8) ?u64 {
+        if (data.size > 2_147_483_647u) data = data.slice(0u, 2_147_483_647u);
 
-        var result = SSL_write(self.ssl, data, size as i32);
+        var result = SSL_write(self.ssl, data.ptr, data.size as i32);
         if (result < 0) return Option:[u64]::none();
 
         return result as u64;

@@ -7,7 +7,7 @@ import std::net::unix::{DnsEntry, Domain, Type, getaddrinfo, freeaddrinfo};
 
 import std::c::{to_cstring, free, printf};
 
-pub func resolve_domain(domain: StringView, buffer: mut* [4]u8, capacity: u32) u32 {
+pub func resolve_domain(domain: StringView, buffer: mut [][4]u8) u32 {
     var hints = DnsEntry {
         family:   Domain::IP4,
         socktype: Type::TCP,
@@ -24,8 +24,8 @@ pub func resolve_domain(domain: StringView, buffer: mut* [4]u8, capacity: u32) u
     var entry = results;
     var count = 0u;
 
-    while (entry != null && count < capacity) {
-        buffer[count++] = entry.addr.ip;
+    while (entry != null && count < buffer.size) {
+        buffer.ptr[count++] = entry.addr.ip;
         entry = entry.next;
     }
 
