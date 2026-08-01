@@ -7,7 +7,7 @@ import std::c::{to_cstring, free};
 // Bindings
 
 #[cfg(target_os = "linux")]
-enum Flags : i32 {
+enum LibFlags : i32 {
     Lazy = 0x00001,
     Now = 0x00002,
     NoLoad = 0x00004,
@@ -48,7 +48,7 @@ pub struct Library {
 impl Library {
     pub func open(name: StringView) ?Self {
         var c_name = to_cstring(name);
-        var handle = dlopen(c_name, Flags::Lazy as i32 | Flags::Local as i32);
+        var handle = dlopen(c_name, LibFlags::Lazy as i32 | LibFlags::Local as i32);
         free(c_name);
 
         if (handle == null) {

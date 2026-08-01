@@ -8,7 +8,7 @@ import std::os::{Seek};
 // Bindings
 
 #[cfg(target_os = "linux")]
-enum Flags : i32 {
+enum FileFlags : i32 {
     ReadOnly = 0,
     WriteOnly = 1,
     Create = 64,
@@ -59,7 +59,7 @@ pub struct Fd {
 impl Fd {
     pub func create(path: StringView) ?Fd {
         var path_c = to_cstring(path);
-        var handle = openat(at_fdcwd(), path_c, Flags::Create as i32 | Flags::Truncate as i32 | Flags::WriteOnly as i32 | Flags::CloseOnExec as i32, 438);
+        var handle = openat(at_fdcwd(), path_c, FileFlags::Create as i32 | FileFlags::Truncate as i32 | FileFlags::WriteOnly as i32 | FileFlags::CloseOnExec as i32, 438);
         free(path_c);
 
         if (handle < 0) return Option:[Fd]::none();
@@ -68,7 +68,7 @@ impl Fd {
 
     pub func open(path: StringView) ?Fd {
         var path_c = to_cstring(path);
-        var handle = openat(at_fdcwd(), path_c, Flags::ReadOnly as i32 | Flags::CloseOnExec as i32, 0);
+        var handle = openat(at_fdcwd(), path_c, FileFlags::ReadOnly as i32 | FileFlags::CloseOnExec as i32, 0);
         free(path_c);
 
         if (handle < 0) return Option:[Fd]::none();
