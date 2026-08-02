@@ -1,0 +1,166 @@
+mod std::fmt;
+
+import std::io::{Writer};
+
+pub enum FloatMode {
+    General,
+    Fixed,
+}
+
+pub func format_u64(w: mut Writer, value: u64) {
+    var buffer: [20]u8;
+    var len = 0u;
+
+    for (;;) {
+        buffer[len++] = '0' + (value % 10u) as u8;
+        value /= 10u;
+
+        if (value == 0u) break;
+    }
+
+    var slice = (buffer as mut []u8).slice(0u, len);
+    slice.reverse();
+
+    w.write(slice);
+}
+
+pub func format_i64(w: mut Writer, value: i64) {
+    var uval = value as u64;
+
+    if (value < 0) {
+        w.write("-");
+        uval = (uval ^ 18446744073709551615u) + 1u;
+    }
+
+    format_u64(w, uval);
+}
+
+pub func format_f64(w: mut Writer, value: f64, precision: u32, mode: FloatMode) {
+    // 1. Handle edge cases (NaN, Infinity)
+    if (value != value) {
+        w.write("NaN");
+        return;
+    }
+
+    if (value * 0.0 != 0.0) {
+        if (value < 0.0) {
+            w.write("-Infinity");
+        } else {
+            w.write("Infinity");
+        }
+        return;
+    }
+
+    // 2. Handle Sign
+    if (value < 0.0) {
+        w.write("-");
+        value = -value;
+    }
+
+    // Cap precision to a maximum of 64 digits
+    if (precision > 64u) {
+        precision = 64u;
+    }
+
+    // 3. Normalize for Scientific Notation (Levels 1 & 2)
+    var use_scientific = false;
+    var exp_val = 0u;
+    var exp_neg = false;
+
+    if (value != 0.0) {
+        // Upper threshold: 1 quadrillion (safely below u64 max of 18.4 quintillion)
+        if (value >= 1000000000000000.0) {
+            use_scientific = true;
+            while (value >= 10.0) {
+                value /= 10.0;
+                exp_val += 1u;
+            }
+        }
+        // Lower threshold: 0.0001
+        else if (value < 0.0001) {
+            use_scientific = true;
+            exp_neg = true;
+            while (value < 1.0) {
+                value *= 10.0;
+                exp_val += 1u;
+            }
+        }
+    }
+
+    // 4. Calculate rounding adjustment (half up)
+    var rounding = 0.5;
+    for (var i = 0u; i < precision; i++) {
+        rounding /= 10.0;
+    }
+    value += rounding;
+
+    // 5. Handle Rounding Overflow in Scientific Mode
+    // Example: 9.999... rounded up becomes 10.0, which breaks the 1-digit rule!
+    if (use_scientific && value >= 10.0) {
+        value /= 10.0;
+        if (exp_neg) {
+            exp_val -= 1u;
+            // Rare edge case: 0.999... rounded to 1.0 makes exponent 0
+            if (exp_val == 0u) {
+                use_scientific = false;
+            }
+        } else {
+            exp_val += 1u;
+        }
+    }
+
+    // 6. Split into integer and fractional parts
+    // (100% safe now because 'value' is strictly < 1 quadrillion!)
+    var int_part = value as u64;
+    var frac_part = value - (int_part as f64);
+
+    format_u64(w, int_part);
+
+    // 7. Extract Fractional Digits
+    if (precision > 0u) {
+        var buffer: [64]u8;
+        var last_non_zero = 0u;
+        var has_non_zero = false;
+
+        for (var i = 0u; i < precision; i++) {
+            frac_part *= 10.0;
+            var digit = frac_part as u64;
+
+            if (digit > 9u) {
+                digit = 9u;
+            }
+
+            buffer[i] = '0' + (digit as u8);
+
+            if (digit != 0u) {
+                last_non_zero = i + 1u;
+                has_non_zero = true;
+            }
+
+            frac_part -= (digit as f64);
+        }
+
+        if (mode == FloatMode::Fixed) {
+            // Always print the dot and the exact number of requested digits
+            w.write(".");
+            var slice = (buffer as mut []u8).slice(0u, precision);
+            w.write(slice);
+        } else if (has_non_zero) {
+            // Only print up to the last meaningful non-zero digit
+            w.write(".");
+            var slice = (buffer as mut []u8).slice(0u, last_non_zero);
+            w.write(slice);
+        }
+    }
+
+    // 8. Append Scientific Exponent
+    if (use_scientific) {
+        if (exp_neg) {
+            w.write("e-");
+        } else {
+            w.write("e");
+        }
+
+        format_u64(w, exp_val);
+    }
+}

@@ -1,0 +1,227 @@
+mod std::fmt;
+
+pub func parse_u64(str: StringView, bits: u32) ?u64 {
+    // Validate
+    if (str.size == 0u || bits == 0u || bits > 64u) {
+        return Option:[u64]::none();
+    }
+
+    // Parse value
+    var value = parse_u64_raw(str)?;
+
+    // Check range
+    var max_val = 18446744073709551615u;
+    if (bits != 64u) max_val = (1u << bits) - 1u;
+
+    if (value > max_val) {
+        return Option:[u64]::none();
+    }
+
+    return value;
+}
+
+pub func parse_i64(str: StringView, bits: u32) ?i64 {
+    // Validate
+    if (str.size == 0u || bits == 0u || bits > 64u) {
+        return Option:[i64]::none();
+    }
+
+    // Parse sign
+    var is_negative = false;
+
+    if (str[0u] == '-') {
+        is_negative = true;
+        str = str.slice(1u, str.size);
+    }
+
+    if (str.size == 0u) {
+        return Option:[i64]::none();
+    }
+
+    // Parse value
+    var value = parse_u64_raw(str)?;
+
+    // Check range
+    var max_val: i64 = 9223372036854775807;
+    if (bits != 64u)  max_val = ((1 as i64) << (bits as i64 - 1)) - 1;
+
+    var min_val: i64 = -9223372036854775807 - 1;
+    if (bits != 64u)  min_val = -((1 as i64) << (bits as i64 - 1));
+
+    var abs_max = max_val as u64 + 1u;
+    if (!is_negative) abs_max = (max_val as u64);
+
+    if (value > abs_max) {
+        return Option:[i64]::none();
+    }
+
+    // Construct final value
+    var result: i64 = 0;
+
+    if (is_negative) {
+        if (value == 9223372036854775808u) {
+            result = min_val;
+        } else {
+            result = -(value as i64);
+        }
+    } else {
+        result = value as i64;
+    }
+
+    return result;
+}
+
+pub func parse_f64(str: StringView) ?f64 {
+    if (str.size == 0u) {
+        return Option:[f64]::none();
+    }
+
+    var i = 0u;
+    var is_negative = false;
+
+    // Parse sign
+    if (str[i] == '-') {
+        is_negative = true;
+        i += 1u;
+    } else if (str[i] == '+') {
+        i += 1u;
+    }
+
+    if (i == str.size) {
+        return Option:[f64]::none();
+    }
+
+    // Parse integer part
+    var int_part = 0.0;
+    var has_int_digits = false;
+
+    while (i < str.size) {
+        var ch = str[i];
+        if (ch >= '0' && ch <= '9') {
+            int_part = (int_part * 10.0) + ((ch - '0') as f64);
+            has_int_digits = true;
+            i += 1u;
+        } else {
+            break;
+        }
+    }
+
+    // Parse fractional part
+    var frac_part = 0.0;
+    var frac_divisor = 1.0;
+    var has_frac_digits = false;
+
+    if (i < str.size && str[i] == '.') {
+        i += 1u; // Skip '.'
+
+        while (i < str.size) {
+            var ch = str[i];
+            if (ch >= '0' && ch <= '9') {
+                frac_divisor *= 10.0;
+                frac_part = (frac_part * 10.0) + ((ch - '0') as f64);
+                has_frac_digits = true;
+                i += 1u;
+            } else {
+                break;
+            }
+        }
+    }
+
+    // A valid float needs either an integer or fractional digits (e.g. "5.", ".5", or "5.5")
+    if (!has_int_digits && !has_frac_digits) {
+        return Option:[f64]::none();
+    }
+
+    var result = int_part + (frac_part / frac_divisor);
+
+    // Parse Exponent (e.g. e-5, E10)
+    if (i < str.size && (str[i] == 'e' || str[i] == 'E')) {
+        i += 1u;
+
+        if (i == str.size) {
+            return Option:[f64]::none();
+        }
+
+        var exp_negative = false;
+        if (str[i] == '-') {
+            exp_negative = true;
+            i += 1u;
+        } else if (str[i] == '+') {
+            i += 1u;
+        }
+
+        var exp_val = 0u;
+        var has_exp_digits = false;
+
+        while (i < str.size) {
+            var ch = str[i];
+            if (ch >= '0' && ch <= '9') {
+                // Prevent extreme overflow loops on massive exponent inputs
+                if (exp_val < 1000u) {
+                    exp_val = (exp_val * 10u) + ((ch - '0') as u32);
+                }
+                has_exp_digits = true;
+                i += 1u;
+            } else {
+                break;
+            }
+        }
+
+        if (!has_exp_digits) {
+            return Option:[f64]::none();
+        }
+
+        // Fast exponentiation
+        var multiplier = 1.0;
+        var base = 10.0;
+        var exp_int = exp_val;
+
+        while (exp_int > 0u) {
+            if ((exp_int % 2u) != 0u) {
+                multiplier *= base;
+            }
+            base *= base;
+            exp_int /= 2u;
+        }
+
+        if (exp_negative) {
+            result /= multiplier;
+        } else {
+            result *= multiplier;
+        }
+    }
+
+    // Check for leftover trailing garbage characters
+    if (i != str.size) {
+        return Option:[f64]::none();
+    }
+
+    // Apply main sign
+    if (is_negative) {
+        result = -result;
+    }
+
+    return result;
+}
+
+func parse_u64_raw(str: StringView) ?u64 {
+    var value: u64 = 0u;
+
+    for (var i = 0u; i < str.size; i++) {
+        var ch = str[i];
+
+        if (ch < '0' || ch > '9') {
+            return Option:[u64]::none();
+        }
+
+        var digit = (ch - '0') as u64;
+
+        if (value > (18446744073709551615u - digit) / 10u) {
+            return Option:[u64]::none();
+        }
+
+        value = (value * 10u) + digit;
+    }
+
+    return value;
+}

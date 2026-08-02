@@ -1,0 +1,25 @@
+mod std::json;
+
+pub enum TokenKind {
+    EOF,
+
+    ObjectStart,
+    ObjectEnd,
+
+    ArrayStart,
+    ArrayEnd,
+
+    Property,
+
+    String,
+    Number,
+
+    True,
+    False,
+    Null,
+}
+
+pub struct Token {
+    pub kind: TokenKind,
+    pub text: StringView,
+}

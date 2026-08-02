@@ -3,6 +3,7 @@ mod std::net::http;
 import std::net::http::{Method, Status, HeaderMap, Response, HttpSocket};
 import std::net::{Uri, resolve_domain, Socket, TlsSocket};
 import std::io::{Writer};
+import std::fmt::{format_u64};
 
 pub struct Request {
     pub method: Method,
@@ -71,7 +72,7 @@ impl Request {
         if (!has_accept) self.write_header(socket, "Accept", "*/*");
 
         socket.write("Content-Length: ");
-        write_u64:[mut* HttpSocket](&socket, self.body.size);
+        format_u64(&socket, self.body.size);
         socket.write("\r\n");
 
         socket.write("\r\n");
@@ -154,24 +155,4 @@ impl Request {
     pub func close(mut self) {
         self.headers.free();
     }
-}
-
-func write_u64[T: mut Writer](writer: T, num: u64) {
-    var buffer: [32]u8;
-    var len = 0u;
-
-    for (;;) {
-        buffer[len++] = '0' + (num % 10u) as u8;
-        num /= 10u;
-
-        if (num == 0u) break;
-    }
-
-    for (var i = 0u; i < len / 2u; i++) {
-        var temp = buffer[i];
-        buffer[i] = buffer[len - i - 1u];
-        buffer[len - i - 1u] = temp;
-    }
-
-    writer.write((buffer as []u8).slice(0u, len));
 }

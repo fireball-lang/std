@@ -1,0 +1,176 @@
+mod std::json;
+
+import std::fmt::{FloatMode, format_u64, format_i64, format_f64};
+import std::json::{EntityKind, TokenKind, Token};
+import std::{ArrayList};
+import std::io;
+
+pub struct Writer {
+    writer: mut io::Writer,
+
+    entities: ArrayList[EntityKind],
+    has_item: bool,
+
+    pub indent: StringView,
+}
+
+impl Writer {
+    pub func new(writer: mut io::Writer) Writer {
+        return Writer {
+            writer: writer,
+        };
+    }
+
+    pub func free(mut self) {
+        self.entities.free();
+    }
+
+    pub func object_start(mut self) {
+        if (self.is_in_array()) {
+            self.item();
+        }
+
+        self.writer.write("{");
+
+        self.entities.add(EntityKind::Object);
+        self.has_item = false;
+
+        self.new_line();
+    }
+
+    pub func object_end(mut self) {
+        self.entities.remove_last();
+        self.has_item = true;
+
+        self.new_line();
+        self.writer.write("}");
+    }
+
+    pub func array_start(mut self) {
+        if (self.is_in_array()) {
+            self.item();
+        }
+
+        self.writer.write("[");
+
+        self.entities.add(EntityKind::Array);
+        self.has_item = false;
+
+        self.new_line();
+    }
+
+    pub func array_end(mut self) {
+        self.entities.remove_last();
+        self.has_item = true;
+
+        self.new_line();
+        self.writer.write("]");
+    }
+
+    pub func property(mut self, name: StringView) {
+        self.item();
+
+        self.writer.write("\"");
+        self.writer.write(name);
+
+        if (self.indent.size > 0u) {
+            self.writer.write("\": ");
+        } else {
+            self.writer.write("\":");
+        }
+    }
+
+    pub func string(mut self, value: StringView) {
+        if (self.is_in_array()) {
+            self.item();
+        }
+
+        self.writer.write("\"");
+        self.writer.write(value);
+        self.writer.write("\"");
+    }
+
+    pub func u64(mut self, value: u64) {
+        if (self.is_in_array()) {
+            self.item();
+        }
+
+        format_u64(self.writer, value);
+    }
+
+    pub func i64(mut self, value: i64) {
+        if (self.is_in_array()) {
+            self.item();
+        }
+
+        format_i64(self.writer, value);
+    }
+
+    pub func f64(mut self, value: f64) {
+        if (self.is_in_array()) {
+            self.item();
+        }
+
+        format_f64(self.writer, value, 64u, FloatMode::General);
+    }
+
+    pub func bool(mut self, value: bool) {
+        if (self.is_in_array()) {
+            self.item();
+        }
+
+        if (value) {
+            self.writer.write("true");
+        } else {
+            self.writer.write("false");
+        }
+    }
+
+    pub func null_(mut self) {
+        if (self.is_in_array()) {
+            self.item();
+        }
+
+        self.writer.write("null");
+    }
+
+    pub func token(mut self, token: Token) {
+        if (token.kind == TokenKind::ObjectStart) self.object_start();
+        else if (token.kind == TokenKind::ObjectEnd) self.object_end();
+        else if (token.kind == TokenKind::ArrayStart) self.array_start();
+        else if (token.kind == TokenKind::ArrayEnd) self.array_end();
+        else if (token.kind == TokenKind::Property) self.property(token.text);
+        else if (token.kind == TokenKind::String) self.string(token.text);
+        else {
+            if (self.is_in_array()) {
+                self.item();
+            }
+
+            self.writer.write(token.text);
+        }
+    }
+
+    func is_in_array(self) bool {
+        var last = self.entities.last() or EntityKind::Object;
+        return last == EntityKind::Array;
+    }
+
+    func item(mut self) {
+        if (self.has_item) {
+            self.writer.write(",");
+            self.new_line();
+        } else {
+            self.has_item = true;
+        }
+    }
+
+    func new_line(mut self) {
+        if (self.indent.size == 0u) return;
+
+        self.writer.write("\n");
+
+        for (var i = 0u; i < self.entities.size(); i++) {
+            self.writer.write(self.indent);
+        }
+    }
+}

@@ -1,0 +1,435 @@
+mod std::json;
+
+import std::json::{Token, TokenKind};
+import std::{ArrayList};
+import std::io;
+
+enum EntityKind {
+    Object,
+    Array,
+}
+
+impl EntityKind {
+    func ending_ch(self) u8 {
+        if (*self == EntityKind::Object) return '}';
+        return ']';
+    }
+}
+
+struct Entity {
+    kind: EntityKind,
+    property: bool,
+}
+
+pub struct Reader {
+    reader: mut io::Reader,
+
+    current: u8,
+    next: u8,
+
+    entities: ArrayList[Entity],
+
+    buffer: ArrayList[u8],
+
+    pub allow_comments: bool,
+    pub allow_trailing_commas: bool,
+}
+
+impl Reader {
+    pub func new(reader: mut io::Reader) ?Reader {
+        var r = Reader {
+            reader: reader,
+        };
+
+        r.advance(false)?;
+        r.advance(false)?;
+
+        return r;
+    }
+
+    pub func free(mut self) {
+        self.entities.free();
+        self.buffer.free();
+    }
+
+    pub func next(mut self) ?Token {
+        // Setup token parser
+        self.buffer.clear();
+        self.skip_whitespace()?;
+
+        var entity = self.entities.last() or Entity {};
+        var ch = self.advance(true)?;
+
+        // EOF
+        if (ch == 0u) {
+            return self.token(TokenKind::EOF);
+        }
+
+        // } | ]
+        if (self.entities.size() > 0u && ch == entity.kind.ending_ch()) {
+            var kind = TokenKind::ObjectEnd;
+            if (entity.kind == EntityKind::Array) kind = TokenKind::ArrayEnd;
+
+            self.entities.remove_last();
+
+            var token = self.token(kind);
+            self.comma()?;
+
+            return token;
+        }
+
+        // "...":
+        if (self.entities.size() > 0u && entity.property) {
+            // "..."
+            if (ch != '"') {
+                return Option:[Token]::none();
+            }
+
+            var token = self.string()?;
+            token.kind = TokenKind::Property;
+
+            // :
+            self.skip_whitespace()?;
+
+            if (self.current != ':') {
+                return Option:[Token]::none();
+            }
+
+            self.advance(false)?;
+            self.skip_whitespace()?;
+
+            self.entities.get_ptr(self.entities.size() - 1u).property = false;
+
+            return token;
+        }
+
+        // {
+        if (ch == '{') {
+            self.entities.add(Entity {
+                kind: EntityKind::Object,
+                property: true,
+            });
+
+            return self.token(TokenKind::ObjectStart);
+        }
+
+        // [
+        if (ch == '[') {
+            self.entities.add(Entity {
+                kind: EntityKind::Array,
+            });
+
+            return self.token(TokenKind::ArrayStart);
+        }
+
+        // "..."
+        if (ch == '"') {
+            var token = self.string()?;
+            self.comma()?;
+
+            return token;
+        }
+
+        // <number>
+        if (is_digit(ch) || (ch == '-' && is_digit(self.current))) {
+            var token = self.number()?;
+            self.comma()?;
+
+            return token;
+        }
+
+        // true | false | null
+        if (is_alpha(ch)) {
+            var token = self.identifier()?;
+            self.comma()?;
+
+            return token;
+        }
+
+        // <invalid>
+        return Option:[Token]::none();
+    }
+
+    func comma(mut self) ?bool {
+        if (self.entities.size() == 0u) {
+            return true;
+        }
+
+        self.skip_whitespace()?;
+
+        if (self.current == ',') {
+            self.advance(false)?;
+            self.skip_whitespace()?;
+
+            if ((self.current == '}' || self.current == ']') && !self.allow_trailing_commas) {
+                return Option:[bool]::none();
+            }
+
+            var entity = self.entities.get_ptr(self.entities.size() - 1u);
+            if (entity.kind == EntityKind::Object) entity.property = true;
+
+            return true;
+        }
+
+        if (self.current != '}' && self.current != ']') {
+            return Option:[bool]::none();
+        }
+
+        return true;
+    }
+
+    func string(mut self) ?Token {
+        while (self.current != '"' && self.current != '\n' && self.current != 0u) {
+            if (self.current != '\\') {
+                self.advance(true)?;
+                continue;
+            }
+
+            self.advance(false)?;
+
+            // " | \ | / | b | f | n | r | t
+            if (self.current == '"' || self.current == '\\' || self.current == '/') {
+                self.advance(true)?;
+                continue;
+            }
+
+            // \b
+            if (self.current == 'b') {
+                self.advance(false)?;
+                self.buffer.add('\b');
+                continue;
+            }
+
+            // \f
+            if (self.current == 'f') {
+                self.advance(false)?;
+                self.buffer.add('\f');
+                continue;
+            }
+
+            // \n
+            if (self.current == 'n') {
+                self.advance(false)?;
+                self.buffer.add('\n');
+                continue;
+            }
+
+            // \r
+            if (self.current == 'r') {
+                self.advance(false)?;
+                self.buffer.add('\r');
+                continue;
+            }
+
+            // \t
+            if (self.current == 't') {
+                self.advance(false)?;
+                self.buffer.add('\t');
+                continue;
+            }
+
+            // u[0-9a-fA-F]{4}
+            if (self.current == 'u') {
+                // u
+                self.advance(false)?;
+
+                // [0-9a-fA-F]{4}
+                for (var i = 0; i < 4; i++) {
+                    if (!is_hex_digit(self.current)) {
+                        return Option:[Token]::none();
+                    }
+
+                    self.advance(false)?;
+                }
+
+                // TODO: When UTF-8 support is added, properly convert the 4 hexadecimal digits to a character
+                continue;
+            }
+
+            // <invalid>
+            return Option:[Token]::none();
+        }
+
+        if (self.current == 0u || self.current == '\n') {
+            return Option:[Token]::none();
+        }
+
+        self.advance(true)?;
+
+        return self.token(TokenKind::String);
+    }
+
+    func number(mut self) ?Token {
+        // [0-9]*
+        while (is_digit(self.current)) {
+            self.advance(true)?;
+        }
+
+        // \.[0-9]+
+        if (self.current == '.') {
+            // \.
+            self.advance(true)?;
+
+            // [0-9]+
+            if (!is_digit(self.current)) {
+                return Option:[Token]::none();
+            }
+
+            while (is_digit(self.current)) {
+                self.advance(true)?;
+            }
+        }
+
+        // [eE][+-]?[0-9]+
+        if (self.current == 'e' || self.current == 'E') {
+            // [eE]
+            self.advance(true)?;
+
+            // [+-]?
+            if (self.current == '+' || self.current == '-') {
+                self.advance(true)?;
+            }
+
+            // [0-9]+
+            if (!is_digit(self.current)) {
+                return Option:[Token]::none();
+            }
+
+            while (is_digit(self.current)) {
+                self.advance(true)?;
+            }
+        }
+
+        return self.token(TokenKind::Number);
+    }
+
+    func identifier(mut self) ?Token {
+        while (is_alpha(self.current)) {
+            self.advance(true)?;
+        }
+
+        var token = self.token(TokenKind::True);
+
+        // true
+        if (token.text.eq("true")) {
+            return token;
+        }
+
+        // false
+        if (token.text.eq("false")) {
+            token.kind = TokenKind::False;
+            return token;
+        }
+
+        // null
+        if (token.text.eq("null")) {
+            token.kind = TokenKind::Null;
+            return token;
+        }
+
+        // <invalid>
+        return Option:[Token]::none();
+    }
+
+    func token(self, kind: TokenKind) Token {
+        var text = self.buffer as []u8;
+
+        if (kind == TokenKind::String) {
+            text = text.slice(1u, text.size - 1u);
+        }
+
+        return Token {
+            kind: kind,
+            text: StringView { ptr: text.ptr, size: text.size as u32 },
+        };
+    }
+
+    func skip_whitespace(mut self) ?bool {
+        for (;;) {
+            // Whitespace
+            if (self.current == ' ' || self.current == '\t' || self.current == '\r' || self.current == '\n') {
+                self.advance(false)?;
+                continue;
+            }
+
+            // Line comment
+            if (self.current == '/' && self.allow_comments && self.next == '/') {
+                self.advance(false)?;
+                self.advance(false)?;
+
+                while (self.current != '\n' && self.current != 0u) {
+                    self.advance(false)?;
+                }
+
+                continue;
+            }
+
+            // Block comment
+            if (self.current == '/' && self.allow_comments && self.next == '*') {
+                self.advance(false)?;
+                self.advance(false)?;
+
+                var depth = 1;
+
+                while (self.current != 0u && depth > 0) {
+                    // /*
+                    if (self.current == '/' && self.next == '*') {
+                        self.advance(false)?;
+                        self.advance(false)?;
+
+                        depth++;
+                        continue;
+                    }
+
+                    // */
+                    if (self.current == '*' && self.next == '/') {
+                        self.advance(false)?;
+                        self.advance(false)?;
+
+                        depth--;
+                        continue;
+                    }
+
+                    // Other
+                    self.advance(false)?;
+                }
+
+                continue;
+            }
+
+            // Return
+            break;
+        }
+
+        return true;
+    }
+
+    func advance(mut self, add_to_buffer: bool) ?u8 {
+        var old = self.current;
+
+        if (add_to_buffer && old != 0u) {
+            self.buffer.add(old);
+        }
+
+        self.current = self.next;
+
+        var byte: u8 = 0u;
+        var read = self.reader.read(MutSlice:[u8] { ptr: &byte, size: 1u })?;
+        self.next = byte;
+        if (read == 0u) self.next = 0u;
+
+        return old;
+    }
+}
+
+func is_digit(ch: u8) bool {
+    return ch >= '0' && ch <= '9';
+}
+
+func is_hex_digit(ch: u8) bool {
+    return (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F');
+}
+
+func is_alpha(ch: u8) bool {
+    return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z');
+}

@@ -39,9 +39,39 @@ impl[T] ArrayList[T] {
         self.size += items.size;
     }
 
-    pub func remove(mut self, index: u64) {
-        memmove(&self.ptr[index], &self.ptr[index + 1u], (self.size - index - 1u) * sizeof(T));
+    pub func first(self) ?T {
+        if (self.size == 0u) return Option:[T]::none();
+        return self.ptr[0u];
+    }
+
+    pub func last(self) ?T {
+        if (self.size == 0u) return Option:[T]::none();
+        return self.ptr[self.size - 1u];
+    }
+
+    pub func remove(mut self, index: u64) T {
+        if (index >= self.size) {
+            panic("ArrayList.remove() - invalid index");
+        }
+
+        var item = self.ptr[index];
+
+        if (index < self.size - 1u) memmove(&self.ptr[index], &self.ptr[index + 1u], (self.size - index - 1u) * sizeof(T));
         self.size--;
+
+        return item;
+    }
+
+    pub func remove_first(mut self) T {
+        return self.remove(0u);
+    }
+
+    pub func remove_last(mut self) T {
+        return self.remove(self.size - 1u);
+    }
+
+    pub func clear(mut self) {
+        self.size = 0u;
     }
 
     pub func size(self) u64 {

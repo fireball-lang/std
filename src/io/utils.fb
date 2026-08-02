@@ -1,0 +1,17 @@
+mod std::io;
+
+import std::io::{Reader, Writer};
+
+pub func copy(src: mut Reader, dst: mut Writer) ?u64 {
+    var total: u64;
+    var buffer: [256]u8;
+
+    for (;;) {
+        var size = src.read(buffer)?;
+        if (size == 0u) break;
+
+        dst.write((buffer as []u8).slice(0u, size));
+    }
+
+    return total;
+}
