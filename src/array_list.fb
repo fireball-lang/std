@@ -97,6 +97,32 @@ impl[T] ArrayList[T] {
     }
 }
 
+impl[T: Eq] ArrayList[T] {
+	pub func index_of(self, value: T) ?u64 {
+		for (var i = 0u; i < self.size; i++) {
+			if (self.ptr[i].eq(value)) return i;
+		}
+
+		return Option:[u64]::none();
+	}
+
+	pub func contains(self, value: T) bool {
+		return self.index_of(value).is_some();
+	}
+}
+
+impl[T: Eq] ArrayList[T] : Eq {
+	pub func eq(self, other: Self) bool {
+		if (self.size != other.size) return false;
+
+		for (var i = 0u; i < self.size; i++) {
+			if (!self.ptr[i].eq(other.ptr[i])) return false;
+		}
+
+		return true;
+	}
+}
+
 impl[T] ArrayList[T] : Index[u64] {
     type Result = T;
 
