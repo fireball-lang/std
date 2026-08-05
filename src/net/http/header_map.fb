@@ -2,9 +2,35 @@ mod std::net::http;
 
 import std::{ArrayList};
 
+pub struct HeaderValue {
+    pub value: StringView,
+}
+
+impl HeaderValue {
+    pub func ptr(self) *u8 {
+        return self.value.ptr;
+    }
+
+    pub func size(self) u32 {
+        return self.value.size;
+    }
+}
+
+impl HeaderValue : Eq[StringView] {
+    pub func eq(self, rhs: StringView) bool {
+        return case_insensitive_eq(self.value, rhs);
+    }
+}
+
+impl HeaderValue : ImplicitAs[StringView] {
+    pub func implicit_as(self) StringView {
+        return self.value;
+    }
+}
+
 pub struct Header {
     pub key: StringView,
-    pub value: StringView,
+    pub value: HeaderValue,
 }
 
 impl Header {
@@ -23,18 +49,18 @@ impl HeaderMap {
             var item = self.headers.get_ptr(i);
 
             if (case_insensitive_eq(item.key, key)) {
-                item.value = value;
+                item.value = HeaderValue { value: value };
                 return;
             }
         }
 
         self.headers.add(Header {
             key: key,
-            value: value,
+            value: HeaderValue { value: value },
         });
     }
 
-    pub func try_get(self, key: StringView, value: mut* StringView) bool {
+    pub func try_get(self, key: StringView, value: mut* HeaderValue) bool {
         for (var i = 0u; i < self.headers.size(); i++) {
             var item = self.headers.get_ptr(i);
 
@@ -47,8 +73,8 @@ impl HeaderMap {
         return false;
     }
 
-    pub func get(self, key: StringView) StringView {
-        var value: StringView;
+    pub func get(self, key: StringView) HeaderValue {
+        var value: HeaderValue;
         var ok = self.try_get(key, &value);
 
         return value;
@@ -64,7 +90,7 @@ impl HeaderMap {
         return false;
     }
 
-    pub func remove(mut self, key: StringView) StringView {
+    pub func remove(mut self, key: StringView) HeaderValue {
         for (var i = 0u; i < self.headers.size(); i++) {
             var item = self.headers.get_ptr(i);
 
@@ -75,7 +101,7 @@ impl HeaderMap {
             }
         }
 
-        return "";
+        return HeaderValue {};
     }
 
     pub func size(self) u64 {
@@ -92,10 +118,10 @@ impl HeaderMap {
 }
 
 impl HeaderMap : Index[StringView] {
-    type Result = StringView;
+    type Result = HeaderValue;
 
-    pub func index(self, i: StringView) StringView {
-        var value: StringView;
+    pub func index(self, i: StringView) HeaderValue {
+        var value: HeaderValue;
         if (!self.try_get(i, &value)) panic("ArrayMap::[] - value not found");
 
         return value;

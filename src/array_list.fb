@@ -97,10 +97,10 @@ impl[T] ArrayList[T] {
     }
 }
 
-impl[T: Eq] ArrayList[T] {
+impl[T: Eq[T]] ArrayList[T] {
 	pub func index_of(self, value: T) ?u64 {
 		for (var i = 0u; i < self.size; i++) {
-			if (self.ptr[i].eq(value)) return i;
+			if (self.ptr[i] == value) return i;
 		}
 
 		return Option:[u64]::none();
@@ -111,12 +111,12 @@ impl[T: Eq] ArrayList[T] {
 	}
 }
 
-impl[T: Eq] ArrayList[T] : Eq {
-	pub func eq(self, other: Self) bool {
+impl[T: Eq[T]] ArrayList[T] : Eq[[]T] {
+	pub func eq(self, other: []T) bool {
 		if (self.size != other.size) return false;
 
 		for (var i = 0u; i < self.size; i++) {
-			if (!self.ptr[i].eq(other.ptr[i])) return false;
+			if (self.ptr[i] != other.ptr[i]) return false;
 		}
 
 		return true;

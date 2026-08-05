@@ -7,16 +7,16 @@ pub struct Item[K, V] {
     pub value: V,
 }
 
-pub struct ArrayMap[K: Eq, V] {
+pub struct ArrayMap[K: Eq[K], V] {
     items: ArrayList[Item[K, V]],
 }
 
-impl[K: Eq, V] ArrayMap[K, V] {
+impl[K: Eq[K], V] ArrayMap[K, V] {
     pub func insert(mut self, key: K, value: V) {
         for (var i = 0u; i < self.items.size(); i++) {
             var item = self.items.get_ptr(i);
 
-            if (item.key.eq(key)) {
+            if (item.key == key) {
                 item.value = value;
                 return;
             }
@@ -32,7 +32,7 @@ impl[K: Eq, V] ArrayMap[K, V] {
         for (var i = 0u; i < self.items.size(); i++) {
             var item = self.items.get_ptr(i);
 
-            if (item.key.eq(key)) {
+            if (item.key == key) {
                 *value = item.value;
                 return true;
             }
@@ -43,7 +43,7 @@ impl[K: Eq, V] ArrayMap[K, V] {
 
     pub func contains(self, key: K) bool {
         for (var i = 0u; i < self.items.size(); i++) {
-            if (self.items[i].key.eq(key)) {
+            if (self.items[i].key == key) {
                 return true;
             }
         }
@@ -55,7 +55,7 @@ impl[K: Eq, V] ArrayMap[K, V] {
         for (var i = 0u; i < self.items.size(); i++) {
             var item = self.items.get_ptr(i);
 
-            if (item.key.eq(key)) {
+            if (item.key == key) {
                 var value = item.value;
                 self.items.remove(i);
                 return value;
@@ -79,7 +79,7 @@ impl[K: Eq, V] ArrayMap[K, V] {
     }
 }
 
-impl[K: Eq, V] ArrayMap[K, V] : Index[K] {
+impl[K: Eq[K], V] ArrayMap[K, V] : Index[K] {
     type Result = V;
 
     pub func index(self, i: K) V {
