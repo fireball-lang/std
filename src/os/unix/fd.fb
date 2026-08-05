@@ -22,7 +22,7 @@ func at_fdcwd() i32 {
 }
 
 #[cfg(target_os = "macos")]
-enum Flags : i32 {
+enum FileFlags : i32 {
     ReadOnly = 0,
     WriteOnly = 1,
     Create = 512,

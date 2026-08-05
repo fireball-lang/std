@@ -19,7 +19,7 @@ enum LibFlags : i32 {
 }
 
 #[cfg(target_os = "macos")]
-enum Flags : i32 {
+enum LibFlags : i32 {
     Lazy = 0x00001,
     Now = 0x00002,
     NoLoad = 0x00010,

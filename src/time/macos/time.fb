@@ -1,0 +1,43 @@
+#[cfg(target_os = "macos")]
+
+mod std::time::macos;
+
+import std::time::{Duration};
+
+struct MachTimebaseInfo {
+    numer: u32,
+    denom: u32,
+}
+
+#[extern]
+func mach_continuous_time() u64;
+
+#[extern]
+func mach_timebase_info(info: mut* MachTimebaseInfo) i32;
+
+var MACH_TIMEBASE_NUMER: u64;
+var MACH_TIMEBASE_DENOM: u64;
+
+#[init]
+func init_constants() {
+    var info = MachTimebaseInfo { numer: 0u, denom: 0u };
+    mach_timebase_info(&info);
+
+    MACH_TIMEBASE_NUMER = info.numer as u64;
+    MACH_TIMEBASE_DENOM = info.denom as u64;
+}
+
+pub func now() u64 {
+    return mach_continuous_time();
+}
+
+pub func duration_since(earlier: u64, latter: u64) Duration {
+    var tick_diff = latter - earlier;
+    var total_nanos = (tick_diff * MACH_TIMEBASE_NUMER) / MACH_TIMEBASE_DENOM;
+
+    return Duration::from_nanos(total_nanos);
+}
+
+pub func duration_to_ticks(dur: Duration) ?u64 {
+    return (dur.as_nanos()? * MACH_TIMEBASE_DENOM) / MACH_TIMEBASE_NUMER;
+}

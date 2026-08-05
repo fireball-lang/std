@@ -1,0 +1,45 @@
+#[cfg(target_os = "windows")]
+
+mod std::time::windows;
+
+import std::time::{Duration};
+
+#[extern]
+func QueryPerformanceCounter(lpPerformanceCount: mut* u64) i32;
+
+#[extern]
+func QueryPerformanceFrequency(lpFrequency: mut* u64) i32;
+
+var QPC_FREQUENCY: u64;
+
+#[init]
+func init_time_constants() {
+    var freq = 0u as u64;
+    QueryPerformanceFrequency(&freq);
+
+    QPC_FREQUENCY = freq;
+}
+
+pub func now() u64 {
+    var ticks = 0u as u64;
+    QueryPerformanceCounter(&ticks);
+
+    return ticks;
+}
+
+pub func duration_since(earlier: u64, latter: u64) Duration {
+    var tick_diff = latter - earlier;
+
+    var secs = tick_diff / QPC_FREQUENCY;
+    var rem_ticks = tick_diff % QPC_FREQUENCY;
+    var nanos = ((rem_ticks * 1_000_000_000u) / QPC_FREQUENCY) as u32;
+
+    return Duration { secs: secs, nanos: nanos };
+}
+
+pub func duration_to_ticks(dur: Duration) ?u64 {
+    var secs_ticks = dur.secs * QPC_FREQUENCY;
+    var nanos_ticks = ((dur.nanos as u64) * QPC_FREQUENCY) / 1_000_000_000u;
+
+    return secs_ticks + nanos_ticks;
+}

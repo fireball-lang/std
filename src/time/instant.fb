@@ -1,0 +1,46 @@
+mod std::time;
+
+import std::time::{Duration};
+
+#[cfg(target_os = "windows")]
+import std::time::windows as imp;
+#[cfg(target_os = "linux")]
+import std::time::linux as imp;
+#[cfg(target_os = "macos")]
+import std::time::macos as imp;
+
+pub struct Instant {
+    ticks: u64,
+}
+
+impl Instant {
+    pub func now() Instant {
+        return Instant { ticks: imp::now() };
+    }
+
+    pub func duration_since(self, earlier: Instant) Duration {
+        return imp::duration_since(earlier.ticks, self.ticks);
+    }
+
+    pub func elapsed(self) Duration {
+        return Instant::now().duration_since(*self);
+    }
+}
+
+impl Instant : Add[Duration] {
+    type Result = Instant;
+
+    pub func add(self, dur: Duration) Instant {
+        var added_ticks = imp::duration_to_ticks(dur).unwrap();
+        return Instant { ticks: self.ticks + added_ticks };
+    }
+}
+
+impl Instant : Sub[Duration] {
+    type Result = Instant;
+
+    pub func sub(self, dur: Duration) Instant {
+        var sub_ticks = imp::duration_to_ticks(dur).unwrap();
+        return Instant { ticks: self.ticks - sub_ticks };
+    }
+}

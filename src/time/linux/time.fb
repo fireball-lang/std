@@ -1,0 +1,34 @@
+#[cfg(target_os = "linux")]
+
+mod std::time::linux;
+
+import std::time::{Duration};
+
+struct TimeSpec {
+    tv_sec: i64,
+    tv_nsec: i64,
+}
+
+#[extern]
+func clock_gettime(clk_id: i32, tp: mut* TimeSpec) i32;
+
+pub func now() u64 {
+    var ts = TimeSpec { tv_sec: 0, tv_nsec: 0 };
+
+    // 7i32 is CLOCK_BOOTTIME on Linux (includes suspend time)
+    clock_gettime(7, &ts);
+
+    // Flatten into a single u64 nanosecond counter
+    var ticks = (ts.tv_sec as u64) * 1_000_000_000u + (ts.tv_nsec as u64);
+
+    return ticks;
+}
+
+pub func duration_since(earlier: u64, latter: u64) Duration {
+    var tick_diff = latter - earlier;
+    return Duration::from_nanos(tick_diff);
+}
+
+pub func duration_to_ticks(dur: Duration) ?u64 {
+    return dur.as_nanos();
+}

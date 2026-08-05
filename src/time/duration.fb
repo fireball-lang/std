@@ -1,0 +1,289 @@
+mod std::time;
+
+import std::fmt::{Display, Formatter};
+
+var NANOS_PER_SEC: u32;
+var NANOS_PER_MILLI: u32;
+var MILLIS_PER_SEC: u64;
+var SECS_PER_HOUR: u64;
+
+var MAX_SECS_FOR_MILLIS: u64;
+var MAX_MILLIS_REMAINDER: u64;
+var MAX_SECS_FOR_NANOS: u64;
+var MAX_NANOS_REMAINDER: u64;
+
+#[init]
+func init_constants() {
+    NANOS_PER_SEC = 1_000_000_000u;
+    NANOS_PER_MILLI = 1_000_000u;
+    MILLIS_PER_SEC = 1_000u;
+    SECS_PER_HOUR = 3_600u;
+
+    MAX_SECS_FOR_MILLIS = 18_446_744_073_709_551u;
+    MAX_MILLIS_REMAINDER = 615u;
+    MAX_SECS_FOR_NANOS = 18_446_744_073u;
+    MAX_NANOS_REMAINDER = 709_551_615u;
+}
+
+pub struct Duration {
+    pub secs: u64,
+    pub nanos: u32,
+}
+
+impl Duration {
+    pub func from_hours(hours: u64) Duration {
+        return Duration { secs: hours * SECS_PER_HOUR };
+    }
+
+    pub func from_secs(secs: u64) Duration {
+        return Duration { secs: secs };
+    }
+
+    pub func from_millis(millis: u64) Duration {
+        var secs = millis / MILLIS_PER_SEC;
+        var nanos = ((millis % MILLIS_PER_SEC) as u32) * NANOS_PER_MILLI;
+
+        return Duration { secs: secs, nanos: nanos };
+    }
+
+    pub func from_nanos(nanos: u64) Duration {
+        var secs = nanos / (NANOS_PER_SEC as u64);
+        var rem_nanos = (nanos % (NANOS_PER_SEC as u64)) as u32;
+
+        return Duration { secs: secs, nanos: rem_nanos };
+    }
+}
+
+impl Duration {
+    pub func as_hours(self) u64 {
+        return self.secs / SECS_PER_HOUR;
+    }
+
+    pub func as_hours_f64(self) f64 {
+        return self.as_secs_f64() / (SECS_PER_HOUR as f64);
+    }
+
+    pub func as_secs(self) u64 {
+        return self.secs;
+    }
+
+    pub func as_secs_f64(self) f64 {
+        return (self.secs as f64) + ((self.nanos as f64) / (NANOS_PER_SEC as f64));
+    }
+
+    func as_millis(self) ?u64 {
+        var nanos_part = (self.nanos / NANOS_PER_MILLI) as u64;
+
+        if (self.secs > MAX_SECS_FOR_MILLIS) {
+            return Option:[u64]::none();
+        }
+
+        if (self.secs == MAX_SECS_FOR_MILLIS && nanos_part > MAX_MILLIS_REMAINDER) {
+            return Option:[u64]::none();
+        }
+
+        return (self.secs * MILLIS_PER_SEC) + nanos_part;
+    }
+
+    pub func as_millis_f64(self) f64 {
+        return ((self.secs as f64) * 1000.0) + ((self.nanos as f64) / 1_000_000.0);
+    }
+
+    pub func as_nanos(self) ?u64 {
+        var nanos_part = self.nanos as u64;
+
+        if (self.secs > MAX_SECS_FOR_NANOS) {
+            return Option:[u64]::none();
+        }
+
+        if (self.secs == MAX_SECS_FOR_NANOS && nanos_part > MAX_NANOS_REMAINDER) {
+            return Option:[u64]::none();
+        }
+
+        return (self.secs * NANOS_PER_SEC) + nanos_part;
+    }
+}
+
+impl Duration : Display {
+    pub func display(self, fmt: Formatter) {
+        // Edge case: Exactly zero
+        if (self.secs == 0u && self.nanos == 0u) {
+            fmt.str("0s");
+            return;
+        }
+
+        // 1. Calculate all components
+        var hours = self.secs / 3600u;
+        var minutes = (self.secs / 60u) % 60u;
+        var seconds = self.secs % 60u;
+
+        var millis = self.nanos / 1_000_000u;
+        var micros = (self.nanos / 1_000u) % 1_000u;
+        var nanos = self.nanos % 1_000u;
+
+        // 2. Cascade down the scales.
+        // We print the largest unit, and optionally the next smaller unit
+        // if it exists, then exit early.
+
+        // --- HOURS SCALE ---
+        if (hours > 0u) {
+            fmt.u64(hours);
+            fmt.str("h");
+
+            if (minutes > 0u) {
+                fmt.str(" ");
+                fmt.u64(minutes);
+                fmt.str("m");
+            }
+
+            return;
+        }
+
+        // --- MINUTES SCALE ---
+        if (minutes > 0u) {
+            fmt.u64(minutes);
+            fmt.str("m");
+
+            if (seconds > 0u) {
+                fmt.str(" ");
+                fmt.u64(seconds);
+                fmt.str("s");
+            }
+
+            return;
+        }
+
+        // --- SECONDS SCALE ---
+        if (seconds > 0u) {
+            fmt.u64(seconds);
+            fmt.str("s");
+
+            // Only show milliseconds if it's less than a minute total
+            if (millis > 0u) {
+                fmt.str(" ");
+                fmt.u64(millis);
+                fmt.str("ms");
+            }
+
+            return;
+        }
+
+        // --- MILLISECONDS SCALE ---
+        if (millis > 0u) {
+            fmt.u64(millis);
+            fmt.str("ms");
+            // Threshold: Only show micros if under 100ms
+            if (millis < 100u && micros > 0u) {
+                fmt.str(" ");
+                fmt.u64(micros);
+                fmt.str("us");
+            }
+            return;
+        }
+
+        // --- MICROSECONDS SCALE ---
+        if (micros > 0u) {
+            fmt.u64(micros);
+            fmt.str("us");
+
+            // Threshold: Only show nanos if under 100us (0.1ms)
+            if (micros < 100u && nanos > 0u) {
+                fmt.str(" ");
+                fmt.u64(nanos);
+                fmt.str("ns");
+            }
+
+            return;
+        }
+
+        // --- NANOSECONDS SCALE ---
+        if (nanos > 0u) {
+            fmt.u64(nanos);
+            fmt.str("ns");
+            return;
+        }
+    }
+}
+
+impl Duration : Add[Duration] {
+    type Result = Duration;
+
+    pub func add(self, rhs: Duration) Duration {
+        var total_nanos = self.nanos + rhs.nanos;
+        var carry_sec = 0u as u64;
+
+        if (total_nanos >= NANOS_PER_SEC) {
+            total_nanos = total_nanos - NANOS_PER_SEC;
+            carry_sec = 1u;
+        }
+
+        var total_secs = self.secs + rhs.secs + carry_sec;
+
+        return Duration { secs: total_secs, nanos: total_nanos };
+    }
+}
+
+impl Duration : Sub[Duration] {
+    type Result = Duration;
+
+    pub func sub(self, rhs: Duration) Duration {
+        var final_secs = self.secs - rhs.secs;
+        var final_nanos = 0u as u32;
+
+        if (self.nanos < rhs.nanos) {
+            final_secs = final_secs - 1u;
+            final_nanos = (self.nanos + NANOS_PER_SEC) - rhs.nanos;
+        } else {
+            final_nanos = self.nanos - rhs.nanos;
+        }
+
+        return Duration { secs: final_secs, nanos: final_nanos };
+    }
+}
+
+impl Duration : Mul[u32] {
+    type Result = Duration;
+
+    pub func mul(self, rhs: u32) Duration {
+        if (rhs == 0u) {
+            return Duration { secs: 0u, nanos: 0u };
+        }
+
+        // 1. Multiply nanos
+        var total_nanos = (self.nanos as u64) * rhs;
+
+        // 2. Multiply secs. Check for overflow using division trick
+        var extra_secs = total_nanos / (NANOS_PER_SEC as u64);
+        var final_nanos = (total_nanos % (NANOS_PER_SEC as u64)) as u32;
+
+        var base_secs = self.secs * rhs;
+
+        // 3. Add the extra seconds we got from the nanos
+        var final_secs = base_secs + extra_secs;
+
+        return Duration { secs: final_secs, nanos: final_nanos };
+    }
+}
+
+impl Duration : Div[u32] {
+    type Result = Duration;
+
+    pub func div(self, rhs: u32) Duration {
+        if (rhs == 0u) {
+            panic("Attempted to divide Duration by zero");
+        }
+
+        // 1. Divide the seconds
+        var final_secs = self.secs / rhs;
+        var rem_secs = self.secs % rhs;
+
+        // 2. Convert remaining seconds to nanoseconds
+        var rem_nanos = rem_secs * (NANOS_PER_SEC as u64);
+
+        // 3. Add our existing nanos and divide the whole lot
+        var total_nanos = rem_nanos + (self.nanos as u64);
+        var final_nanos = (total_nanos / rhs) as u32;
+
+        return Duration { secs: final_secs, nanos: final_nanos };
+    }
+}
