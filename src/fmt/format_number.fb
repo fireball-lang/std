@@ -35,7 +35,7 @@ pub func format_i64(w: mut Writer, value: i64) {
     format_u64(w, uval);
 }
 
-pub func format_f64(w: mut Writer, value: f64, precision: u32, mode: FloatMode) {
+pub func format_f64(w: mut Writer, value: f64, mode: FloatMode, precision: u32) {
     // 1. Handle edge cases (NaN, Infinity)
     if (value != value) {
         w.write("NaN");

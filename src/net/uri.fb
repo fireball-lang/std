@@ -1,5 +1,7 @@
 mod std::net;
 
+import std::fmt::{Display, Formatter};
+
 pub struct Uri {
     pub scheme: StringView,
     pub authority: StringView,
@@ -60,5 +62,27 @@ impl Uri {
         result.path = remaining;
 
         return result;
+    }
+}
+
+impl Uri : Display {
+    pub func display(self, fmt: Formatter) {
+        fmt.str(self.scheme);
+        fmt.str("://");
+        fmt.str(self.authority);
+
+        if (self.path.size > 0u) {
+            fmt.str(self.path);
+        }
+
+        if (self.query.size > 0u) {
+            fmt.str("?");
+            fmt.str(self.query);
+        }
+
+        if (self.fragment.size > 0u) {
+            fmt.str("#");
+            fmt.str(self.fragment);
+        }
     }
 }

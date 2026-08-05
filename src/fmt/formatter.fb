@@ -1,0 +1,37 @@
+mod std::fmt;
+
+import std::fmt::{FloatMode, format_u64, format_i64, format_f64};
+import std::io::{Writer};
+
+pub struct Formatter {
+    pub writer: mut Writer,
+
+    pub float_mode: FloatMode,
+    pub precision: u32,
+}
+
+impl Formatter {
+    pub func new(writer: mut Writer) Formatter {
+        return Formatter {
+            writer: writer,
+            float_mode: FloatMode::General,
+            precision: 8u,
+        };
+    }
+
+    pub func str(mut self, str: StringView) {
+        self.writer.write(str);
+    }
+
+    pub func u64(mut self, value: u64) {
+        format_u64(self.writer, value);
+    }
+
+    pub func i64(mut self, value: i64) {
+        format_i64(self.writer, value);
+    }
+
+    pub func f64(mut self, value: f64) {
+        format_f64(self.writer, value, self.float_mode, self.precision);
+    }
+}

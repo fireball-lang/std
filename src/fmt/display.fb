@@ -1,0 +1,28 @@
+mod std::fmt;
+
+import std::fmt::{Formatter};
+
+pub interface Display {
+    func display(self, fmt: Formatter);
+}
+
+impl StringView : Display {
+    pub func display(self, fmt: Formatter) {
+        fmt.str(*self);
+    }
+}
+
+impl[T: Display] Option[T] : Display {
+    pub func display(self, fmt: Formatter) {
+        // None
+        if (self.is_none()) {
+            fmt.str("None()");
+            return;
+        }
+
+        // Some
+        fmt.str("Some(");
+        self.unwrap().display(fmt);
+        fmt.str(")");
+    }
+}

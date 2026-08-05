@@ -111,7 +111,7 @@ impl Writer {
             self.item();
         }
 
-        format_f64(self.writer, value, 64u, FloatMode::General);
+        format_f64(self.writer, value, FloatMode::General, 64u);
     }
 
     pub func bool(mut self, value: bool) {
