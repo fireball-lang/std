@@ -4,7 +4,6 @@ import std::io::{Reader, Writer};
 
 #[cfg(target_family = "windows")]
 import std::net::windows::{SocketFd, SocketAddress, Domain, Type, Protocol};
-
 #[cfg(target_family = "unix")]
 import std::net::unix::{SocketFd, SocketAddress, Domain, Type, Protocol};
 
@@ -17,6 +16,7 @@ pub struct Socket {
 }
 
 impl Socket {
+    /// Opens an active connection to the given IP address and port.
     pub func connect(ip: [4]u8, port: u16) ?Self {
         var address = SocketAddress::new(Domain::IP4, ip, port);
 
@@ -28,6 +28,7 @@ impl Socket {
         };
     }
 
+    /// Binds a socket to the given IP and port and starts listening for incoming connections.
     pub func listen(ip: [4]u8, port: u16) ?Self {
         var address = SocketAddress::new(Domain::IP4, ip, port);
 
@@ -43,6 +44,8 @@ impl Socket {
         return self.open && self.fd.is_open();
     }
 
+    /// Accepts the next incoming connection from a listening socket.
+    /// Blocks until a connection arrives.
     pub func accept(self) ?Self {
         var address: SocketAddress;
         var address_len = sizeof(SocketAddress);

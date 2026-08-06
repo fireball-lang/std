@@ -5,6 +5,8 @@ import std::net::{Uri, resolve_domain, Socket, TlsSocket};
 import std::io::{Writer};
 import std::fmt::{format_u64};
 
+/// An HTTP request built with `get` / `post` / `put` / `delete` and then sent with `send()`.
+/// `send()` fills in the `Host`, `User-Agent` and `Content-Length` headers automatically if not already set.
 pub struct Request {
     pub method: Method,
     pub uri: Uri,

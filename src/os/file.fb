@@ -33,6 +33,8 @@ impl File {
         };
     }
 
+    /// Wraps an existing `Fd`, taking ownership of it.
+    /// The caller must not close the `Fd` afterwards.
     pub func from_fd(fd: Fd) Self {
         return File {
             fd: fd,
@@ -52,6 +54,8 @@ impl File {
         return size;
     }
 
+    /// Closes the file, releasing the underlying descriptor.
+    /// Panics if the file is already closed.
     pub func close(mut self) {
         if (!self.open) panic("tried to close an already closed file");
 

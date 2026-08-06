@@ -1,5 +1,8 @@
 mod std::fmt;
 
+/// Parses a `StringView` as an unsigned integer.
+/// `bits` is the bit-width to check the range against (e.g. 32 or 64).
+/// Returns `None` if the value does not fit or the string is invalid.
 pub func parse_u64(str: StringView, bits: u32) ?u64 {
     // Validate
     if (str.size == 0u || bits == 0u || bits > 64u) {
@@ -20,6 +23,9 @@ pub func parse_u64(str: StringView, bits: u32) ?u64 {
     return value;
 }
 
+/// Parses a `StringView` as a signed integer, optionally prefixed with `-`.
+/// `bits` is the bit-width to check the range against (e.g. 32 or 64).
+/// Returns `None` if the value does not fit or the string is invalid.
 pub func parse_i64(str: StringView, bits: u32) ?i64 {
     // Validate
     if (str.size == 0u || bits == 0u || bits > 64u) {
@@ -71,6 +77,9 @@ pub func parse_i64(str: StringView, bits: u32) ?i64 {
     return result;
 }
 
+/// Parses a `StringView` as a float.
+/// Supports integer and fractional parts as well as scientific notation (e.g. '5.5', '-1e3').
+/// Returns `None` if the string is invalid.
 pub func parse_f64(str: StringView) ?f64 {
     if (str.size == 0u) {
         return Option:[f64]::none();

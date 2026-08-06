@@ -2,6 +2,7 @@ mod std::net;
 
 import std::fmt::{Display, Formatter};
 
+/// Represents a parsed URI, split into scheme, authority (host), path, query and fragment components.
 pub struct Uri {
     pub scheme: StringView,
     pub authority: StringView,

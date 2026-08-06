@@ -1,5 +1,7 @@
 mod std::io;
 
 pub interface Writer {
+    /// Writes up to `data.size` bytes from the slice and returns the number of bytes written.
+    /// When an error occurs, returns the number of bytes written successfully up to the error and `None` is returned on the next call.
     func write(mut self, data: []u8) ?u64;
 }

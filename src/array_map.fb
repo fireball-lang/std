@@ -51,6 +51,8 @@ impl[K: Eq[K], V] ArrayMap[K, V] {
         return false;
     }
 
+    /// Removes and returns the value for `key`.
+    /// If `key` is absent, returns a default-initialized value.
     pub func remove(mut self, key: K) V {
         for (var i = 0u; i < self.items.size(); i++) {
             var item = self.items.get_ptr(i);
@@ -82,6 +84,8 @@ impl[K: Eq[K], V] ArrayMap[K, V] {
 impl[K: Eq[K], V] ArrayMap[K, V] : Index[K] {
     type Result = V;
 
+    /// Looks up `key`.
+    /// Panics if `key` is not present in the map.
     pub func index(self, i: K) V {
         var value: V;
         if (!self.try_get(i, &value)) panic("ArrayMap::[] - value not found");

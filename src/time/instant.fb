@@ -9,19 +9,24 @@ import std::time::linux as imp;
 #[cfg(target_os = "macos")]
 import std::time::macos as imp;
 
+/// Opaque value representing a single point in time.
 pub struct Instant {
     ticks: u64,
 }
 
 impl Instant {
+    /// Returns the current time instant.
+    /// This function is monotonic, meaning that the returned value can never be less than a value returned by a previous call.
     pub func now() Instant {
         return Instant { ticks: imp::now() };
     }
 
+    /// Returns the duration between `earlier` and this instant, i.e. `self - earlier`.
     pub func duration_since(self, earlier: Instant) Duration {
         return imp::duration_since(earlier.ticks, self.ticks);
     }
 
+    /// Returns the duration elapsed since this instant was captured, i.e. `now() - self`.
     pub func elapsed(self) Duration {
         return Instant::now().duration_since(*self);
     }

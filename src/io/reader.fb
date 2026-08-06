@@ -1,5 +1,7 @@
 mod std::io;
 
 pub interface Reader {
+    /// Reads up to `buffer.size` bytes into the slice and returns the number of bytes read or 0 on EOF (end of file).
+    /// When an error occurs, returns the number of bytes read successfully up to the error and `None` is returned on the next call.
     func read(mut self, buffer: mut []u8) ?u64;
 }
