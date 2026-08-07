@@ -9,6 +9,13 @@ pub struct ArrayList[T] {
 }
 
 impl[T] ArrayList[T] {
+    pub func with_capacity(capacity: u64) Self {
+        var list: Self;
+        list.ensure_capacity(capacity);
+
+        return list;
+    }
+
     pub func ensure_capacity(mut self, additional_size: u64) {
         if (self.size + additional_size <= self.capacity) return;
 
@@ -112,15 +119,21 @@ impl[T: Eq[T]] ArrayList[T] {
 }
 
 impl[T: Eq[T]] ArrayList[T] : Eq[[]T] {
-	pub func eq(self, other: []T) bool {
-		if (self.size != other.size) return false;
+	pub func eq(self, rhs: []T) bool {
+		if (self.size != rhs.size) return false;
 
 		for (var i = 0u; i < self.size; i++) {
-			if (self.ptr[i] != other.ptr[i]) return false;
+			if (self.ptr[i] != rhs.ptr[i]) return false;
 		}
 
 		return true;
 	}
+}
+
+impl[T: Ord[T]] ArrayList[T] : Ord[[]T] {
+    pub func ord(self, rhs: []T) Ordering {
+        return (*self as []T).ord(rhs);
+    }
 }
 
 impl[T] ArrayList[T] : Index[u64] {
