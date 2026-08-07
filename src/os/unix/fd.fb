@@ -16,11 +16,6 @@ enum FileFlags : i32 {
     CloseOnExec = 524288,
 }
 
-#[cfg(target_os = "linux")]
-func at_fdcwd() i32 {
-    return -100;
-}
-
 #[cfg(target_os = "macos")]
 enum FileFlags : i32 {
     ReadOnly = 0,
@@ -30,13 +25,26 @@ enum FileFlags : i32 {
     CloseOnExec = 16777216,
 }
 
+impl FileFlags : BitOr[FileFlags] {
+    type Result = FileFlags;
+
+    pub func bit_or(self, rhs: Self) Self {
+        return (*self as i32 | rhs as i32) as Self;
+    }
+}
+
+#[cfg(target_os = "linux")]
+func at_fdcwd() i32 {
+    return -100;
+}
+
 #[cfg(target_os = "macos")]
 func at_fdcwd() i32 {
     return -2;
 }
 
 #[extern]
-func openat(fd: i32, path: *u8, flags: i32, mode: i32) i32;
+func openat(fd: i32, path: *u8, flags: FileFlags, mode: i32) i32;
 
 #[extern]
 func close(fd: i32) i32;
@@ -59,7 +67,7 @@ pub struct Fd {
 impl Fd {
     pub func create(path: StringView) ?Fd {
         var path_c = to_cstring(path);
-        var handle = openat(at_fdcwd(), path_c, FileFlags::Create as i32 | FileFlags::Truncate as i32 | FileFlags::WriteOnly as i32 | FileFlags::CloseOnExec as i32, 438);
+        var handle = openat(at_fdcwd(), path_c, FileFlags::Create | FileFlags::Truncate | FileFlags::WriteOnly | FileFlags::CloseOnExec, 438);
         free(path_c);
 
         if (handle < 0) return Option:[Fd]::none();
@@ -68,7 +76,7 @@ impl Fd {
 
     pub func open(path: StringView) ?Fd {
         var path_c = to_cstring(path);
-        var handle = openat(at_fdcwd(), path_c, FileFlags::ReadOnly as i32 | FileFlags::CloseOnExec as i32, 0);
+        var handle = openat(at_fdcwd(), path_c, FileFlags::ReadOnly | FileFlags::CloseOnExec, 0);
         free(path_c);
 
         if (handle < 0) return Option:[Fd]::none();

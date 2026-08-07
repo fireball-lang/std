@@ -30,8 +30,16 @@ enum LibFlags : i32 {
     NoDelete = 0x00080,
 }
 
+impl LibFlags : BitOr[LibFlags] {
+    type Result = LibFlags;
+
+    pub func bit_or(self, rhs: Self) Self {
+        return (*self as i32 | rhs as i32) as Self;
+    }
+}
+
 #[extern]
-func dlopen(name: *u8, flags: i32) *void;
+func dlopen(name: *u8, flags: LibFlags) *void;
 
 #[extern]
 func dlsym(handle: *void, name: *u8) *void;
@@ -48,7 +56,7 @@ pub struct Library {
 impl Library {
     pub func open(name: StringView) ?Self {
         var c_name = to_cstring(name);
-        var handle = dlopen(c_name, LibFlags::Lazy as i32 | LibFlags::Local as i32);
+        var handle = dlopen(c_name, LibFlags::Lazy | LibFlags::Local);
         free(c_name);
 
         if (handle == null) {
