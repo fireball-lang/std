@@ -1,0 +1,118 @@
+mod std;
+
+import std::fmt::{Display, Formatter};
+import std::io::{Writer};
+import std::{ArrayList};
+
+pub struct String {
+    bytes: ArrayList[u8],
+}
+
+impl String {
+    pub func new(str: StringView) String {
+        var bytes: ArrayList[u8];
+        bytes.add_all(str);
+
+        return String { bytes: bytes };
+    }
+
+    pub func with_capacity(capacity: u64) String {
+        return String {
+            bytes: ArrayList:[u8]::with_capacity(capacity),
+        };
+    }
+
+    pub func size(self) u64 {
+        return self.bytes.size();
+    }
+
+    pub func capacity(self) u64 {
+        return self.bytes.capacity();
+    }
+
+    pub func as_bytes(self) []u8 {
+        return self.bytes as []u8;
+    }
+
+    pub func as_mut_bytes(self) mut []u8 {
+        return self.bytes.as_mut_slice();
+    }
+
+    pub func ensure_capacity(mut self, additional_size: u64) {
+        self.bytes.ensure_capacity(additional_size);
+    }
+
+    pub func remove(mut self, index: u64) u8 {
+        return self.bytes.remove(index);
+    }
+
+    pub func clear(mut self) {
+        self.bytes.clear();
+    }
+
+    pub func free(mut self) {
+        self.bytes.free();
+    }
+}
+
+impl String {
+	pub func starts_with(self, other: StringView) bool {
+	    return (*self as StringView).starts_with(other);
+	}
+
+	pub func ends_with(self, other: StringView) bool {
+        return (*self as StringView).ends_with(other);
+	}
+
+	pub func contains(self, other: StringView) bool {
+	    return (*self as StringView).contains(other);
+	}
+
+	pub func trim(self) StringView {
+	    return (*self as StringView).trim();
+	}
+
+	pub func index_of(self, other: StringView) i32 {
+        return (*self as StringView).index_of(other);
+	}
+
+	pub func index_of_last(self, other: StringView) i32 {
+	    return (*self as StringView).index_of_last(other);
+	}
+
+	pub func slice(self, start: u32, end: u32) StringView {
+	    return (*self as StringView).slice(start, end);
+	}
+}
+
+impl String : Display {
+    pub func display(self, fmt: Formatter) {
+        fmt.str(*self);
+    }
+}
+
+impl String : Writer {
+    pub func write(mut self, data: []u8) ?u64 {
+        self.bytes.add_all(data);
+        return data.size;
+    }
+}
+
+impl String : Eq[StringView] {
+    pub func eq(self, rhs: StringView) bool {
+        return (*self as StringView) == rhs;
+    }
+}
+
+impl String : Ord[StringView] {
+    pub func ord(self, rhs: StringView) Ordering {
+        return (*self as StringView).ord(rhs);
+    }
+}
+
+impl String : ImplicitAs[StringView] {
+    pub func implicit_as(self) StringView {
+        var slice = self.bytes as []u8;
+        return StringView { ptr: slice.ptr, size: slice.size as u32 };
+    }
+}

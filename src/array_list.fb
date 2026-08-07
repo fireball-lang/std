@@ -85,6 +85,10 @@ impl[T] ArrayList[T] {
         return self.size;
     }
 
+    pub func capacity(self) u64 {
+        return self.capacity;
+    }
+
     pub func get_ptr(mut self, index: u64) mut* T {
         return &self.ptr[index];
     }
