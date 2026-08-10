@@ -1,5 +1,6 @@
 mod std::net::http;
 
+/// HTTP request method.
 pub enum Method {
     GET,
     HEAD,
@@ -15,6 +16,8 @@ pub enum Method {
 }
 
 impl Method {
+    /// Returns the canonical uppercase textual representation of this method (e.g. `GET`, `POST`).
+    /// Returns an empty `StringView` if the method is not recognized.
     pub func string(self) StringView {
         if (*self == Method::GET) return "GET";
         if (*self == Method::HEAD) return "HEAD";
@@ -32,6 +35,7 @@ impl Method {
     }
 }
 
+/// HTTP response status code.
 pub enum Status {
     // 1xx - Informational
     Continue = 100,
@@ -170,22 +174,27 @@ pub enum Status {
 }
 
 impl Status {
+    /// Returns `true` if the status code is in the 1xx class.
     pub func is_informational(self) bool {
         return *self as u16 >= 100u && *self as u16 <= 199u;
     }
 
+    /// Returns `true` if the status code is in the 2xx class.
     pub func is_success(self) bool {
         return *self as u16 >= 200u && *self as u16 <= 299u;
     }
 
+    /// Returns `true` if the status code is in the 3xx class.
     pub func is_redirection(self) bool {
         return *self as u16 >= 300u && *self as u16 <= 399u;
     }
 
+    /// Returns `true` if the status code is in the 4xx class.
     pub func is_client_error(self) bool {
         return *self as u16 >= 400u && *self as u16 <= 499u;
     }
 
+    /// Returns `true` if the status code is in the 5xx class.
     pub func is_server_error(self) bool {
         return *self as u16 >= 500u && *self as u16 <= 599u;
     }

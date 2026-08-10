@@ -1,9 +1,27 @@
 mod std::net::http;
 
-import std::c::{malloc, free, memcpy, printf, exit};
 import std::net::http::{Status, HeaderMap, HttpSocket};
+import std::c::{malloc, free, memcpy, printf, exit};
+import std::fmt::{parse_u64};
 import std::io::{Reader};
 
+enum BodyMode {
+    ContentLength,
+    Chunked,
+    UntilClose,
+}
+
+enum ChunkedState {
+    Size,
+    Data,
+    Done,
+}
+
+/// A received HTTP response, exposing `status`, `headers` and a streaming body via `io::Reader`.
+///
+/// The body is read according to `Content-Length` or `Transfer-Encoding: chunked`; if neither
+/// is present, bytes are read until the connection closes. Owns its header buffer and the
+/// underlying socket — call `close` to release them.
 pub struct Response {
     pub status: Status,
     pub headers: HeaderMap,
@@ -13,6 +31,11 @@ pub struct Response {
     consumed: u64,
 
     socket: HttpSocket,
+
+    body_mode: BodyMode,
+    content_remaining: u64,
+    chunk_remaining: u64,
+    chunked_state: ChunkedState,
 }
 
 impl Response {
@@ -46,7 +69,11 @@ impl Response {
                 var line = StringView { ptr: &res.buffer.ptr[res.consumed], size: end as u32 };
                 res.consumed += end as u64 + 2u;
 
-                if (line.size == 0u) return res;
+                if (line.size == 0u) {
+                    res.determine_body_mode();
+                    return res;
+                }
+
                 res.parse_line(line);
             }
         }
@@ -74,6 +101,139 @@ impl Response {
         self.headers.insert(key, value);
     }
 
+    func determine_body_mode(mut self) {
+        // Chunked
+        if (self.headers.get("Transfer-Encoding") == "chunked") {
+            self.body_mode = BodyMode::Chunked;
+            self.chunked_state = ChunkedState::Size;
+            return;
+        }
+
+        // Content-Length
+        var content_length = self.headers.get("Content-Length");
+
+        if (content_length.size() > 0u) {
+            var length = parse_u64(content_length, 64u);
+
+            if (length.is_some()) {
+                self.body_mode = BodyMode::ContentLength;
+                self.content_remaining = length.unwrap();
+                return;
+            }
+        }
+
+        // Unknown
+        self.body_mode = BodyMode::UntilClose;
+    }
+
+    func read_byte(mut self) ?u8 {
+        if (self.consumed < self.filled) {
+            var b = self.buffer.ptr[self.consumed];
+            self.consumed += 1u;
+            return b;
+        }
+
+        var b: u8;
+        var n = self.socket.read(MutSlice:[u8] { ptr: &b, size: 1u })?;
+        if (n == 0u) return Option:[u8]::none();
+
+        return b;
+    }
+
+    func read_body_bytes(mut self, buffer: mut []u8) ?u64 {
+        var total: u64 = 0u;
+
+        // Drain leftover bytes from the header buffer first
+        var leftover = self.filled - self.consumed;
+
+        if (leftover > 0u) {
+            var to_copy = leftover;
+            if (to_copy > buffer.size) to_copy = buffer.size;
+
+            memcpy(buffer.ptr, &self.buffer.ptr[self.consumed], to_copy);
+            self.consumed += to_copy;
+            total += to_copy;
+        }
+
+        // Read remaining bytes from the socket
+        if (total < buffer.size) {
+            var n = self.socket.read(buffer.slice(total, buffer.size))?;
+            total += n;
+        }
+
+        return total;
+    }
+
+    func read_fixed(mut self, buffer: mut []u8) ?u64 {
+        if (self.content_remaining == 0u) return 0u;
+
+        var to_read = buffer.size;
+        if (to_read > self.content_remaining) to_read = self.content_remaining;
+
+        var read = self.read_body_bytes(buffer.slice(0u, to_read))?;
+        self.content_remaining -= read;
+
+        return read;
+    }
+
+    func read_chunked(mut self, buffer: mut []u8) ?u64 {
+        if (self.chunked_state == ChunkedState::Done) return 0u;
+
+        // Size
+        if (self.chunked_state == ChunkedState::Size) {
+            var size = self.read_chunk_size()?;
+            if (size == 0u) {
+                self.chunked_state = ChunkedState::Done;
+                return 0u;
+            }
+
+            self.chunk_remaining = size;
+            self.chunked_state = ChunkedState::Data;
+        }
+
+        // Data
+        var to_read = buffer.size;
+        if (to_read > self.chunk_remaining) to_read = self.chunk_remaining;
+
+        var read = self.read_body_bytes(buffer.slice(0u, to_read))?;
+        self.chunk_remaining -= read;
+
+        if (self.chunk_remaining == 0u) {
+            var cr = self.read_byte()?;
+            if (cr != '\r') return Option:[u64]::none();
+
+            var lf = self.read_byte()?;
+            if (lf != '\n') return Option:[u64]::none();
+
+            self.chunked_state = ChunkedState::Size;
+        }
+
+        return read;
+    }
+
+    func read_chunk_size(mut self) ?u64 {
+        var line: [256]u8;
+        var i = 0u;
+
+        for (;;) {
+            var b = self.read_byte()?;
+
+            if (b == '\r') {
+                var next = self.read_byte()?;
+                if (next != '\n') return Option:[u64]::none();
+
+                break;
+            }
+
+            if (i >= 256u) return Option:[u64]::none();
+            line[i] = b;
+            i += 1u;
+        }
+
+        return parse_hex(StringView { ptr: &line[0], size: i });
+    }
+
+    /// Frees the response's header buffer, headers map and underlying socket.
     pub func close(mut self) {
         self.headers.free();
         free(self.buffer.ptr);
@@ -83,20 +243,12 @@ impl Response {
 }
 
 impl Response : Reader {
+    /// Reads up to `buffer.size` bytes of the response body, returning the number of bytes read or `0` at end of body.
+    /// Returns `None` on a transport or framing error.
     pub func read(mut self, buffer: mut []u8) ?u64 {
-        var available = self.filled - self.consumed;
-
-        if (available > 0u) {
-            var to_read = available;
-            if (to_read > buffer.size) to_read = buffer.size;
-
-            memcpy(buffer.ptr, &self.buffer.ptr[self.consumed], to_read);
-            self.consumed += to_read;
-
-            return to_read;
-        }
-
-        return self.socket.read(buffer);
+        if (self.body_mode == BodyMode::ContentLength) return self.read_fixed(buffer);
+        if (self.body_mode == BodyMode::Chunked) return self.read_chunked(buffer);
+        return self.read_body_bytes(buffer);
     }
 }
 
@@ -115,6 +267,29 @@ func parse_u32(str: StringView) u32 {
         var c = str.ptr[i];
         if (c < '0' || c > '9') break;
         result = result * 10u + (c - '0');
+    }
+
+    return result;
+}
+
+func parse_hex(str: StringView) u64 {
+    var result: u64 = 0u;
+
+    for (var i = 0u; i < str.size; i++) {
+        var c = str.ptr[i];
+        var digit: u64;
+
+        if (c >= '0' && c <= '9') {
+            digit = (c - '0') as u64;
+        } else if (c >= 'a' && c <= 'f') {
+            digit = (c - 'a' + 10u) as u64;
+        } else if (c >= 'A' && c <= 'F') {
+            digit = (c - 'A' + 10u) as u64;
+        } else {
+            break;
+        }
+
+        result = result * 16u as u64 + digit;
     }
 
     return result;

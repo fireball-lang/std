@@ -2,15 +2,18 @@ mod std::net::http;
 
 import std::{ArrayList};
 
+/// Value of an HTTP header, accessible as a `StringView` with case-insensitive equality.
 pub struct HeaderValue {
     pub value: StringView,
 }
 
 impl HeaderValue {
+    /// Returns a pointer to the start of the value bytes.
     pub func ptr(self) *u8 {
         return self.value.ptr;
     }
 
+    /// Returns the number of bytes in the value.
     pub func size(self) u32 {
         return self.value.size;
     }
@@ -28,22 +31,29 @@ impl HeaderValue : ImplicitAs[StringView] {
     }
 }
 
+/// A single header entry, consisting of a `key` and its `value`.
 pub struct Header {
     pub key: StringView,
     pub value: HeaderValue,
 }
 
 impl Header {
+    /// Returns `true` if this header's key matches `key`, ignoring ASCII case.
     pub func key_eq(self, key: StringView) bool {
         return case_insensitive_eq(self.key, key);
     }
 }
 
+/// A case-insensitive, insertion-ordered map of HTTP headers.
+///
+/// Keys are compared case-insensitively per RFC 9110. Inserting a key that already exists
+/// overwrites the previous value rather than adding a duplicate.
 pub struct HeaderMap {
     headers: ArrayList[Header],
 }
 
 impl HeaderMap {
+    /// Inserts `value` under `key`, replacing the value if `key` is already present.
     pub func insert(mut self, key: StringView, value: StringView) {
         for (var i = 0u; i < self.headers.size(); i++) {
             var item = self.headers.get_ptr(i);
@@ -60,6 +70,8 @@ impl HeaderMap {
         });
     }
 
+    /// Looks up `key` and stores the value in `*value` if present.
+    /// Returns `true` if the key was found, `false` otherwise.
     pub func try_get(self, key: StringView, value: mut* HeaderValue) bool {
         for (var i = 0u; i < self.headers.size(); i++) {
             var item = self.headers.get_ptr(i);
@@ -73,13 +85,15 @@ impl HeaderMap {
         return false;
     }
 
+    /// Looks up `key`, returning a default-initialized `HeaderValue` if it is absent.
     pub func get(self, key: StringView) HeaderValue {
         var value: HeaderValue;
-        var ok = self.try_get(key, &value);
+        self.try_get(key, &value);
 
         return value;
     }
 
+    /// Returns `true` if the map contains `key` (case-insensitive).
     pub func contains(self, key: StringView) bool {
         for (var i = 0u; i < self.headers.size(); i++) {
             if (case_insensitive_eq(self.headers[i].key, key)) {
@@ -90,6 +104,7 @@ impl HeaderMap {
         return false;
     }
 
+    /// Removes `key` and returns its previous value, or a default-initialized `HeaderValue` if absent.
     pub func remove(mut self, key: StringView) HeaderValue {
         for (var i = 0u; i < self.headers.size(); i++) {
             var item = self.headers.get_ptr(i);
@@ -104,14 +119,17 @@ impl HeaderMap {
         return HeaderValue {};
     }
 
+    /// Returns the number of header entries.
     pub func size(self) u64 {
         return self.headers.size();
     }
 
+    /// Returns the header at the given insertion-order index. Panics if `index >= size`.
     pub func get_at(self, index: u32) Header {
         return self.headers[index];
     }
 
+    /// Frees the map's backing storage. The map must not be used afterwards.
     pub func free(mut self) {
         self.headers.free();
     }
@@ -120,9 +138,10 @@ impl HeaderMap {
 impl HeaderMap : Index[StringView] {
     type Result = HeaderValue;
 
+    /// Looks up `key`. Panics if it is not present.
     pub func index(self, i: StringView) HeaderValue {
         var value: HeaderValue;
-        if (!self.try_get(i, &value)) panic("ArrayMap::[] - value not found");
+        if (!self.try_get(i, &value)) panic("HeaderMap::[] - value not found");
 
         return value;
     }

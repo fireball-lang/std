@@ -1,0 +1,224 @@
+mod std::net::http;
+
+import std::net::http::{Request, Response, HttpSocket, Method, Status};
+import std::net::{Uri, Socket, TlsSocket, resolve_domain};
+import std::fmt::{format_u64};
+
+/// An HTTP client that issues requests and follows redirects.
+///
+/// Redirect responses (3xx) are followed automatically, up to `max_redirect_count` hops.
+/// `303 See Other` causes the redirected request to switch to `GET`.
+pub struct Client {
+    max_redirect_count: u32,
+}
+
+impl Client {
+    /// Creates a `Client` with default values.
+    pub func new() Client {
+        return Client {
+            max_redirect_count: 4u,
+        };
+    }
+
+    /// Sends a `GET` request to `url`.
+    /// Returns `None` on connection or parsing failure.
+    pub func get(mut self, url: StringView) ?Response {
+        var req = Request::get(url)?;
+        var res = self.send(req);
+
+        req.close();
+        return res;
+    }
+
+    /// Sends a `DELETE` request to `url`.
+    /// Returns `None` on connection or parsing failure.
+    pub func delete(mut self, url: StringView) ?Response {
+        var req = Request::delete(url)?;
+        var res = self.send(req);
+
+        req.close();
+        return res;
+    }
+
+    /// Sends a `PUT` request to `url` with the given `body`.
+    /// Returns `None` on connection or parsing failure.
+    pub func put(mut self, url: StringView, body: []u8) ?Response {
+        var req = Request::put(url, body)?;
+        var res = self.send(req);
+
+        req.close();
+        return res;
+    }
+
+    /// Sends a `POST` request to `url` with the given `body`.
+    /// Returns `None` on connection or parsing failure.
+    pub func post(mut self, url: StringView, body: []u8) ?Response {
+        var req = Request::post(url, body)?;
+        var res = self.send(req);
+
+        req.close();
+        return res;
+    }
+
+    /// Sends `req` and follows up to `max_redirect_count` redirects.
+    /// The caller retains ownership of `req` and must close it after this returns.
+    /// Returns `None` on connection, parsing or redirect-resolution failure.
+    pub func send(mut self, req: Request) ?Response {
+        return self.send_impl(req, self.max_redirect_count);
+    }
+
+    func send_impl(mut self, req: Request, allowed_redirects: u32) ?Response {
+        // Connect to server
+        var socket = connect(req.uri)?;
+
+        // Send request line
+        write_line(socket, req.method, req.uri);
+
+        // Send headers
+        write_header(socket, "Host", req.uri.authority);
+        write_header(socket, "Accept-Encoding", "identity");
+        write_header(socket, "Connection", "close");
+
+        var has_user_agent = false;
+        var has_accept = false;
+
+        for (var i = 0u; i < req.headers.size(); i++) {
+            var header = req.headers.get_at(i);
+
+            if (header.key_eq("Host")) continue;
+            if (header.key_eq("Accept-Encoding")) continue;
+            if (header.key_eq("Connection")) continue;
+            if (header.key_eq("Content-Length")) continue;
+
+            write_header(socket, header.key, header.value);
+
+            if (header.key_eq("User-Agent")) has_user_agent = true;
+            else if (header.key_eq("Accept")) has_accept = true;
+        }
+
+        if (!has_user_agent) write_header(socket, "User-Agent", "fireball-std");
+        if (!has_accept) write_header(socket, "Accept", "*/*");
+
+        // Send body
+        socket.write("Content-Length: ");
+        format_u64(&socket, req.body.size);
+        socket.write("\r\n");
+
+        socket.write("\r\n");
+
+        socket.write(req.body);
+
+        // Receive response
+        var res = Response::receive_from(socket)?;
+
+        // Handle redirections
+        if (res.status.is_redirection() && allowed_redirects > 0u) {
+            // Parse Location header
+            var uri_opt = Uri::parse(res.headers.get("Location"));
+
+            if (uri_opt.is_none()) {
+                res.close();
+                return Option:[Response]::none();
+            }
+
+            var uri = uri_opt.unwrap();
+
+            if (uri.scheme == "") uri.scheme = req.uri.scheme;
+            if (uri.path == "") uri.path = req.uri.path;
+
+            // Construct new request with copied headers
+            var redirected_req = Request {
+                method: req.method,
+                uri: uri,
+                body: req.body,
+            };
+
+            if (res.status == Status::SeeOther) {
+                redirected_req.method = Method::GET;
+            }
+
+            for (var j = 0u; j < req.headers.size(); j++) {
+                var header = req.headers.get_at(j);
+                redirected_req.headers.insert(header.key, header.value);
+            }
+
+            // Close response and send new request
+            res.close();
+
+            var redirected_res = self.send_impl(redirected_req, allowed_redirects - 1u);
+            redirected_req.close();
+
+            return redirected_res;
+        }
+
+        return res;
+    }
+}
+
+func connect(uri: Uri) ?HttpSocket {
+    // Resolve domain
+    var ips: [4][4]u8;
+    var size = resolve_domain(uri.authority, ips);
+
+    // HTTP
+    if (uri.scheme.eq("http")) {
+        var socket_opt: ?Socket;
+
+        for (var i = 0u; i < size && socket_opt.is_none(); i++) {
+            socket_opt = Socket::connect(ips[i], 80u);
+        }
+
+        return HttpSocket {
+            is_tls: false,
+            normal: socket_opt?,
+        };
+    }
+
+    // HTTPS
+    if (uri.scheme.eq("https")) {
+        var socket_opt: ?TlsSocket;
+
+        for (var i = 0u; i < size && socket_opt.is_none(); i++) {
+            socket_opt = TlsSocket::connect(ips[i], 443u, uri.authority);
+        }
+
+        return HttpSocket {
+            is_tls: true,
+            tls: socket_opt?,
+        };
+    }
+
+    // Invalid
+    panic("invalid URL scheme for HTTP request");
+    return Option:[HttpSocket]::none();
+}
+
+func write_line(socket: HttpSocket, method: Method, uri: Uri) {
+    socket.write(method.string());
+    socket.write(" ");
+
+    if (uri.path.size > 0u) {
+        socket.write(uri.path);
+    } else {
+        socket.write("/");
+    }
+
+    if (uri.query.size > 0u) {
+        socket.write("?");
+        socket.write(uri.query);
+    }
+
+    if (uri.fragment.size > 0u) {
+        socket.write("#");
+        socket.write(uri.fragment);
+    }
+
+    socket.write(" HTTP/1.1\r\n");
+}
+
+func write_header(socket: HttpSocket, key: StringView, value: StringView) {
+    socket.write(key);
+    socket.write(": ");
+    socket.write(value);
+    socket.write("\r\n");
+}

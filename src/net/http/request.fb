@@ -1,12 +1,14 @@
 mod std::net::http;
 
-import std::net::http::{Method, Status, HeaderMap, Response, HttpSocket};
-import std::net::{Uri, resolve_domain, Socket, TlsSocket};
-import std::io::{Writer};
-import std::fmt::{format_u64};
+import std::net::http::{Method, HeaderMap};
+import std::net::{Uri};
 
-/// An HTTP request built with `get` / `post` / `put` / `delete` and then sent with `send()`.
-/// `send()` fills in the `Host`, `User-Agent` and `Content-Length` headers automatically if not already set.
+/// An HTTP request, constructed via `get` / `post` / `put` / `delete` and sent via `Client::send`.
+///
+/// The `Host`, `User-Agent`, `Accept`, `Accept-Encoding`, `Connection` and `Content-Length`
+/// headers are filled in automatically by `Client` if not already set on the request.
+/// Owns its `headers` map; call `close` to release it. The `body` slice is borrowed from
+/// the caller and is not freed by `close`.
 pub struct Request {
     pub method: Method,
     pub uri: Uri,
@@ -16,6 +18,8 @@ pub struct Request {
 }
 
 impl Request {
+    /// Creates a `GET` request for `url`.
+    /// Returns `None` if `url` cannot be parsed as a URI.
     pub func get(url: StringView) ?Self {
         return Self {
             method: Method::GET,
@@ -23,6 +27,8 @@ impl Request {
         };
     }
 
+    /// Creates a `DELETE` request for `url`.
+    /// Returns `None` if `url` cannot be parsed as a URI.
     pub func delete(url: StringView) ?Self {
         return Self {
             method: Method::DELETE,
@@ -30,6 +36,8 @@ impl Request {
         };
     }
 
+    /// Creates a `PUT` request for `url` with the given `body`.
+    /// `body` is borrowed, not copied. Returns `None` if `url` cannot be parsed as a URI.
     pub func put(url: StringView, body: []u8) ?Self {
         return Self {
             method: Method::PUT,
@@ -38,6 +46,8 @@ impl Request {
         };
     }
 
+    /// Creates a `POST` request for `url` with the given `body`.
+    /// `body` is borrowed, not copied. Returns `None` if `url` cannot be parsed as a URI.
     pub func post(url: StringView, body: []u8) ?Self {
         return Self {
             method: Method::POST,
@@ -46,114 +56,7 @@ impl Request {
         };
     }
 
-    pub func send(mut self) ?Response {
-        // Connect to server
-        var socket = self.connect()?;
-
-        // Send request line
-        self.send_line(socket);
-
-        // Send headers
-        self.write_header(socket, "Host", self.uri.authority);
-
-        var has_user_agent = false;
-        var has_accept = false;
-
-        for (var i = 0u; i < self.headers.size(); i++) {
-            var header = self.headers.get_at(i);
-
-            if (!header.key_eq("Host") && !header.key_eq("Content-Length")) {
-                self.write_header(socket, header.key, header.value);
-
-                if (header.key_eq("User-Agent")) has_user_agent = true;
-                else if (header.key_eq("Accept")) has_accept = true;
-            }
-        }
-
-        if (!has_user_agent) self.write_header(socket, "User-Agent", "fireball-std");
-        if (!has_accept) self.write_header(socket, "Accept", "*/*");
-
-        socket.write("Content-Length: ");
-        format_u64(&socket, self.body.size);
-        socket.write("\r\n");
-
-        socket.write("\r\n");
-
-        // Send body
-        socket.write(self.body);
-
-        // Receive resposne
-        return Response::receive_from(socket);
-    }
-
-    func connect(self) ?HttpSocket {
-        // Resolve domain
-        var ips: [4][4]u8;
-        var size = resolve_domain(self.uri.authority, ips);
-
-        // HTTP
-        if (self.uri.scheme.eq("http")) {
-            var socket_opt: ?Socket;
-
-            for (var i = 0u; i < size && socket_opt.is_none(); i++) {
-                socket_opt = Socket::connect(ips[i], 80u);
-            }
-
-            return HttpSocket {
-                is_tls: false,
-                normal: socket_opt?,
-            };
-        }
-
-        // HTTPS
-        if (self.uri.scheme.eq("https")) {
-            var socket_opt: ?TlsSocket;
-
-            for (var i = 0u; i < size && socket_opt.is_none(); i++) {
-                socket_opt = TlsSocket::connect(ips[i], 443u, self.uri.authority);
-            }
-
-            return HttpSocket {
-                is_tls: true,
-                tls: socket_opt?,
-            };
-        }
-
-        // Invalid
-        panic("invalid URL scheme for HTTP request");
-        return Option:[HttpSocket]::none();
-    }
-
-    func send_line(mut self, socket: HttpSocket) {
-        socket.write(self.method.string());
-        socket.write(" ");
-
-        if (self.uri.path.size > 0u) {
-            socket.write(self.uri.path);
-        } else {
-            socket.write("/");
-        }
-
-        if (self.uri.query.size > 0u) {
-            socket.write("?");
-            socket.write(self.uri.query);
-        }
-
-        if (self.uri.fragment.size > 0u) {
-            socket.write("#");
-            socket.write(self.uri.fragment);
-        }
-
-        socket.write(" HTTP/1.0\r\n");
-    }
-
-    func write_header(mut self, socket: HttpSocket, key: StringView, value: StringView) {
-        socket.write(key);
-        socket.write(": ");
-        socket.write(value);
-        socket.write("\r\n");
-    }
-
+    /// Frees the request's `headers` map. Does not free `body`.
     pub func close(mut self) {
         self.headers.free();
     }
