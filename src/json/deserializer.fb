@@ -1,0 +1,396 @@
+mod std::json;
+
+import std::json::{Reader, Token, TokenKind, Options};
+import std::fmt::{parse_u64, parse_i64, parse_f64};
+import std::c::{malloc, free};
+import std::io;
+
+/// Implement this interface on a type to override the reflection-based deserialization.
+pub interface Deserialize {
+    /// Returns `Some(true)` if the value deserialized correctly.
+    /// Returns `None` on error, any memory allocations that happened before the error need to be freed before returning.
+    func deserialize(mut self, de: mut* Deserializer) ?bool;
+}
+
+pub struct Deserializer {
+    reader: Reader,
+
+    next: ??Token,
+}
+
+impl Deserializer {
+    /// Creates a new `Deserializer` with the options `opts`.
+    pub func new(reader: mut io::Reader, opts: Options) ?Self {
+        var r = Reader::new(reader)?;
+
+        r.allow_comments = opts.allow_comments;
+        r.allow_trailing_commas = opts.allow_trailing_commas;
+
+        return Self {
+            reader: r,
+        };
+    }
+
+    pub func free(mut self) {
+        self.reader.free();
+    }
+
+    // Reader
+
+    /// Returns the next token without consuming it.
+    pub func peek(mut self) ?Token {
+        if (self.next.is_some()) {
+            return self.next.unwrap();
+        }
+
+        var token = self.reader.next();
+        self.next = token;
+
+        return token;
+    }
+
+    /// Returns the next token and advances past it.
+    pub func next(mut self) ?Token {
+        if (self.next.is_some()) {
+            var token = self.next.unwrap();
+            self.next = Option:[?Token]::none();
+
+            return token;
+        }
+
+        return self.reader.next();
+    }
+
+    /// Asserts that the next token is `TokenKind::ObjectStart`.
+    /// Returns the token or `None` if the token kind does not match.
+    pub func object_start(mut self) ?Token {
+        var token = self.next()?;
+        if (token.kind != TokenKind::ObjectStart) return Option:[Token]::none();
+
+        return token;
+    }
+
+    /// Asserts that the next token is `TokenKind::ObjectEnd`.
+    /// Returns the token or `None` if the token kind does not match.
+    pub func object_end(mut self) ?Token {
+        var token = self.next()?;
+        if (token.kind != TokenKind::ObjectEnd) return Option:[Token]::none();
+
+        return token;
+    }
+
+    /// Asserts that the next token is `TokenKind::ArrayStart`.
+    /// Returns the token or `None` if the token kind does not match.
+    pub func array_start(mut self) ?Token {
+        var token = self.next()?;
+        if (token.kind != TokenKind::ArrayStart) return Option:[Token]::none();
+
+        return token;
+    }
+
+    /// Asserts that the next token is `TokenKind::ArrayEnd`.
+    /// Returns the token or `None` if the token kind does not match.
+    pub func array_end(mut self) ?Token {
+        var token = self.next()?;
+        if (token.kind != TokenKind::ArrayEnd) return Option:[Token]::none();
+
+        return token;
+    }
+
+    /// Asserts that the next token is `TokenKind::Property`.
+    /// Returns the token or `None` if the token kind does not match.
+    pub func property(mut self) ?Token {
+        var token = self.next()?;
+        if (token.kind != TokenKind::Property) return Option:[Token]::none();
+
+        return token;
+    }
+
+    /// Asserts that the next token is `TokenKind::String`.
+    /// Returns the token or `None` if the token kind does not match.
+    pub func string(mut self) ?Token {
+        var token = self.next()?;
+        if (token.kind != TokenKind::String) return Option:[Token]::none();
+
+        return token;
+    }
+
+    /// Asserts that the next token is `TokenKind::Number`.
+    /// Returns the token or `None` if the token kind does not match.
+    pub func number(mut self) ?Token {
+        var token = self.next()?;
+        if (token.kind != TokenKind::Number) return Option:[Token]::none();
+
+        return token;
+    }
+
+    /// Skips the next JSON value recursively.
+    /// Meaning that if the next token starts an object or an array,
+    /// the function will keep advancing until it reaches the end of the object / array.
+    pub func skip(mut self) ?bool {
+        var depth = 0;
+
+        for (;;) {
+            var token = self.next()?;
+            if (token.kind == TokenKind::EOF) return Option:[bool]::none();
+
+            if (token.kind == TokenKind::ObjectStart || token.kind == TokenKind::ArrayStart) {
+                depth++;
+                continue;
+            }
+
+            if (token.kind == TokenKind::ObjectEnd || token.kind == TokenKind::ArrayEnd) {
+                depth--;
+                if (depth == 0) break;
+
+                continue;
+            }
+
+            if (depth == 0) break;
+        }
+
+        return true;
+    }
+
+    // Deserialize
+
+    /// Deserializes a value of type `info` into `ptr` and returns `Some(true)`, otherwise `None` on error.
+    pub func deserialize(mut self, ptr: mut* void, info: *TypeInfo) ?bool {
+        // Primitive
+        if (info.kind == TypeKind::Primitive) {
+            var kind = info.primitive_kind();
+            var token = self.next()?;
+
+            if (kind == PrimitiveKind::Bool) {
+                if (token.kind == TokenKind::True) {
+                    *(ptr as mut* bool) = true;
+                    return true;
+                }
+                if (token.kind == TokenKind::False) {
+                    *(ptr as mut* bool) = false;
+                    return true;
+                }
+
+                return Option:[bool]::none();
+            }
+
+            if (token.kind != TokenKind::Number) return Option:[bool]::none();
+
+            if (kind.is_unsigned_integer()) {
+                var value = parse_u64(token.text, info.size * 8u)?;
+
+                if (kind == PrimitiveKind::U8) *(ptr as mut* u8) = value as u8;
+                else if (kind == PrimitiveKind::U16) *(ptr as mut* u16) = value as u16;
+                else if (kind == PrimitiveKind::U32) *(ptr as mut* u32) = value as u32;
+                else if (kind == PrimitiveKind::U64) *(ptr as mut* u64) = value as u64;
+
+                return true;
+            }
+
+            if (kind.is_signed_integer()) {
+                var value = parse_i64(token.text, info.size * 8u)?;
+
+                if (kind == PrimitiveKind::I8) *(ptr as mut* i8) = value as i8;
+                else if (kind == PrimitiveKind::I16) *(ptr as mut* i16) = value as i16;
+                else if (kind == PrimitiveKind::I32) *(ptr as mut* i32) = value as i32;
+                else if (kind == PrimitiveKind::I64) *(ptr as mut* i64) = value as i64;
+
+                return true;
+            }
+
+            if (kind.is_floating()) {
+                var value = parse_f64(token.text)?;
+
+                if (kind == PrimitiveKind::F32) *(ptr as mut* f32) = value as f32;
+                else if (kind == PrimitiveKind::F64) *(ptr as mut* f64) = value as f64;
+
+                return true;
+            }
+
+            panic("Invalid primitive kind");
+            return Option:[bool]::none();
+        }
+
+        // Array
+        if (info.kind == TypeKind::Array) {
+            self.array_start()?;
+
+            var size = info.array_size();
+            var element = info.element();
+            var i = 0u;
+
+            for (;;) {
+                var kind = self.peek()?.kind;
+                if (kind == TokenKind::EOF || kind == TokenKind::ArrayEnd) break;
+
+                if (i >= size) return Option:[bool]::none();
+
+                self.deserialize(&(ptr as mut* u8)[i * element.size], element)?;
+                i++;
+            }
+
+            if (i != size) return Option:[bool]::none();
+
+            self.array_end()?;
+            return true;
+        }
+
+        // Pointer
+        if (info.kind == TypeKind::Pointer) {
+            var token = self.peek()?;
+            var ptr = ptr as mut* mut* void;
+
+            if (token.kind == TokenKind::Null) {
+                self.next();
+                *ptr = null;
+
+                return true;
+            }
+
+            var pointee = info.pointee();
+            *ptr = malloc(pointee.size);
+
+            if (self.deserialize(*ptr, pointee).is_none()) {
+                free(*ptr);
+                return Option:[bool]::none();
+            }
+
+            return true;
+        }
+
+        // implements Serialize
+        var vtable = info.get_vtable(typeof(Deserialize));
+
+        if (vtable != null) {
+            if (self.peek()?.kind == TokenKind::Null) {
+                self.next();
+                return true;
+            }
+
+            var value: mut Deserialize;
+
+            (&value as mut **void)[0] = ptr;
+            (&value as mut **void)[1] = vtable;
+
+            return value.deserialize(self);
+        }
+
+        // Enum
+        if (info.kind == TypeKind::Enum) {
+            var token = self.string()?;
+
+            var kind = info.enum_underlying().primitive_kind();
+            var cases = info.cases();
+
+            for (var i = 0u; i < cases.size; i++) {
+                var case = cases[i];
+                if (case.name != token.text) continue;
+
+                if (kind.is_unsigned_integer()) {
+                    if (kind == PrimitiveKind::U8) *(ptr as mut* u8) = case.value as u8;
+                    else if (kind == PrimitiveKind::U16) *(ptr as mut* u16) = case.value as u16;
+                    else if (kind == PrimitiveKind::U32) *(ptr as mut* u32) = case.value as u32;
+                    else if (kind == PrimitiveKind::U64) *(ptr as mut* u64) = case.value as u64;
+
+                    return true;
+                }
+
+                var value = case.value as i64;
+                if (case.negative) value = -value;
+
+                if (kind == PrimitiveKind::I8) *(ptr as mut* i8) = value as i8;
+                else if (kind == PrimitiveKind::I16) *(ptr as mut* i16) = value as i16;
+                else if (kind == PrimitiveKind::I32) *(ptr as mut* i32) = value as i32;
+                else if (kind == PrimitiveKind::I64) *(ptr as mut* i64) = value as i64;
+
+                return true;
+            }
+
+            return Option:[bool]::none();
+        }
+
+        // Struct
+        if (info.kind == TypeKind::Struct) {
+            self.object_start()?;
+
+            var fields = info.fields();
+
+            for (;;) {
+                var kind = self.peek()?.kind;
+                if (kind == TokenKind::EOF || kind == TokenKind::ObjectEnd) break;
+
+                var property = self.property()?;
+                var found = false;
+
+                for (var i = 0u; i < fields.size; i++) {
+                    var field = fields[i];
+                    if (field.name != property.text) continue;
+                    if (!field.public) break;
+
+                    var ptr = &(ptr as mut* u8)[field.offset];
+                    self.deserialize(ptr, field.type_info)?;
+
+                    found = true;
+                    break;
+                }
+
+                if (found) continue;
+                self.skip()?;
+            }
+
+            self.object_end()?;
+            return true;
+        }
+
+        // Invalid
+        panic("Failed to deserialize type");
+        return Option:[bool]::none();
+    }
+}
+
+/// Deerializes a `value` from the `reader` using `options`.
+pub func deserialize_with_options[T](reader: mut io::Reader, opts: Options) ?T {
+    var de = Deserializer::new(reader, opts)?;
+
+    var value: T;
+    if (de.deserialize(&value, typeof(T)).is_none()) {
+        de.free();
+        return Option:[T]::none();
+    }
+
+    de.free();
+    return value;
+}
+
+/// Deerializes a `value` from the `reader` using the default options, see `Options::new()`.
+pub func deserialize[T](reader: mut io::Reader) ?T {
+    return deserialize_with_options:[T](reader, Options {});
+}
+
+// Core implementations
+
+impl[T] Option[T] : Deserialize {
+    func deserialize(mut self, de: mut* Deserializer) ?bool {
+        var token = de.peek()?;
+
+        var has_value = &(self as mut* u8)[offsetof(Option[T], has_value)] as mut* bool;
+        var value = &(self as mut* u8)[offsetof(Option[T], value)] as mut* T;
+
+        // None
+        if (token.kind == TokenKind::Null) {
+            de.next();
+            *has_value = false;
+
+            return true;
+        }
+
+        // Some
+        if (de.deserialize(value, typeof(T)).is_none()) {
+            *has_value = false;
+            return false;
+        }
+
+        *has_value = true;
+        return true;
+    }
+}

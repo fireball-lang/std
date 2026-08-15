@@ -1,6 +1,8 @@
 mod std::net;
 
+import std::json::{Serialize, Serializer, Deserialize, Deserializer};
 import std::fmt::{Display, Formatter};
+import std::{String};
 
 /// Represents a parsed URI, split into scheme, authority (host), path, query and fragment components.
 pub struct Uri {
@@ -85,5 +87,23 @@ impl Uri : Display {
             fmt.str("#");
             fmt.str(self.fragment);
         }
+    }
+}
+
+impl Uri : Serialize {
+    pub func serialize(self, se: mut* Serializer) {
+        var str: String;
+
+        self.display(Formatter::new(&str));
+        se.string(str);
+
+        str.free();
+    }
+}
+
+impl Uri : Deserialize {
+    pub func deserialize(mut self, de: mut* Deserializer) ?bool {
+        *self = Uri::parse(de.string()?.text)?;
+        return true;
     }
 }

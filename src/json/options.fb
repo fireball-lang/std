@@ -1,0 +1,30 @@
+mod std::json;
+
+/// Stores configuration options for both the deserializer and serializer.
+pub struct Options {
+    /// Controls one level of indentation in serialization,
+    /// empty string means no identation.
+    pub indent: StringView,
+
+    /// Controls whenever comments are allowed in deserialization.
+    pub allow_comments: bool,
+
+    /// Controls whenever trailing commas are allowed in deserialization.
+    pub allow_trailing_commas: bool,
+}
+
+impl Options {
+    /// Creates the default options.
+    pub func new() Options {
+        return Options {};
+    }
+
+    /// Creates options for 'modern' JSON5,
+    /// enabling comments and trailing commas.
+    pub func modern() Options {
+        return Options {
+            allow_comments: true,
+            allow_trailing_commas: true,
+        };
+    }
+}

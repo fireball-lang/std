@@ -1,5 +1,6 @@
 mod std;
 
+import std::json::{Serialize, Serializer, Deserialize, Deserializer, TokenKind};
 import std::c::{malloc, free, memcpy, memmove};
 
 pub struct ArrayList[T] {
@@ -151,5 +152,36 @@ impl[T] ArrayList[T] : Index[u64] {
 impl[T] ArrayList[T] : ImplicitAs[[]T] {
     pub func implicit_as(self) []T {
         return Slice:[T] { ptr: self.ptr, size: self.size };
+    }
+}
+
+impl[T] ArrayList[T] : Serialize {
+    pub func serialize(self, se: mut* Serializer) {
+        se.array_start();
+
+        for (var i = 0u; i < self.size; i++) {
+            se.serialize(&self.ptr[i], typeof(T));
+        }
+
+        se.array_end();
+    }
+}
+
+impl[T] ArrayList[T] : Deserialize {
+    pub func deserialize(mut self, de: mut* Deserializer) ?bool {
+        de.array_start()?;
+
+        for (;;) {
+            var kind = de.peek()?.kind;
+            if (kind == TokenKind::EOF || kind == TokenKind::ArrayEnd) break;
+
+            var item: T;
+            de.deserialize(&item, typeof(T))?;
+
+            self.add(item);
+        }
+
+        de.array_end()?;
+        return true;
     }
 }

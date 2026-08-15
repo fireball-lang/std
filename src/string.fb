@@ -1,5 +1,6 @@
 mod std;
 
+import std::json::{Serialize, Serializer, Deserialize, Deserializer};
 import std::fmt::{Display, Formatter};
 import std::io::{Writer};
 import std::{ArrayList};
@@ -85,19 +86,6 @@ impl String {
 	}
 }
 
-impl String : Display {
-    pub func display(self, fmt: Formatter) {
-        fmt.str(*self);
-    }
-}
-
-impl String : Writer {
-    pub func write(mut self, data: []u8) ?u64 {
-        self.bytes.add_all(data);
-        return data.size;
-    }
-}
-
 impl String : Eq[StringView] {
     pub func eq(self, rhs: StringView) bool {
         return (*self as StringView) == rhs;
@@ -114,5 +102,33 @@ impl String : ImplicitAs[StringView] {
     pub func implicit_as(self) StringView {
         var slice = self.bytes as []u8;
         return StringView { ptr: slice.ptr, size: slice.size as u32 };
+    }
+}
+
+impl String : Writer {
+    pub func write(mut self, data: []u8) ?u64 {
+        self.bytes.add_all(data);
+        return data.size;
+    }
+}
+
+impl String : Display {
+    pub func display(self, fmt: Formatter) {
+        fmt.str(*self);
+    }
+}
+
+impl String : Serialize {
+    pub func serialize(self, se: mut* Serializer) {
+        se.string(*self);
+    }
+}
+
+impl String : Deserialize {
+    func deserialize(mut self, de: mut* Deserializer) ?bool {
+        self.bytes.clear();
+        self.bytes.add_all(de.string()?.text);
+
+        return true;
     }
 }

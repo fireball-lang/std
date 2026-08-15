@@ -14,7 +14,7 @@ pub func parse_u64(str: StringView, bits: u32) ?u64 {
 
     // Check range
     var max_val = 18446744073709551615u;
-    if (bits != 64u) max_val = (1u << bits) - 1u;
+    if (bits != 64u) max_val = ((1u as u64) << bits) - 1u;
 
     if (value > max_val) {
         return Option:[u64]::none();

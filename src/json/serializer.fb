@@ -1,0 +1,251 @@
+mod std::json;
+
+import std::json::{Writer, Options};
+import std::io;
+
+/// Implement this interface on a type to override the reflection-based serialization.
+pub interface Serialize {
+    func serialize(self, se: mut* Serializer);
+}
+
+pub struct Serializer {
+    writer: Writer,
+}
+
+impl Serializer {
+    /// Creates a new `Serializer` with the options `opts`.
+    pub func new(writer: mut io::Writer, opts: Options) Self {
+        var w = Writer::new(writer);
+
+        w.indent = opts.indent;
+
+        return Self {
+            writer: w,
+        };
+    }
+
+    pub func free(mut self) {
+        self.writer.free();
+    }
+
+    // Writer
+
+    pub func object_start(mut self) {
+        self.writer.object_start();
+    }
+
+    pub func object_end(mut self) {
+        self.writer.object_end();
+    }
+
+    pub func array_start(mut self) {
+        self.writer.array_start();
+    }
+
+    pub func array_end(mut self) {
+        self.writer.array_end();
+    }
+
+    pub func property(mut self, name: StringView) {
+        self.writer.property(name);
+    }
+
+    pub func string(mut self, value: StringView) {
+        self.writer.string(value);
+    }
+
+    pub func u64(mut self, value: u64) {
+        self.writer.u64(value);
+    }
+
+    pub func i64(mut self, value: i64) {
+        self.writer.i64(value);
+    }
+
+    pub func f64(mut self, value: f64) {
+        self.writer.f64(value);
+    }
+
+    pub func bool(mut self, value: bool) {
+        self.writer.bool(value);
+    }
+
+    pub func null_(mut self) {
+        self.writer.null_();
+    }
+
+    // Serialize
+
+    /// Serializes a value of type `info` stored inside `ptr`.
+    pub func serialize(mut self, ptr: *void, info: *TypeInfo) {
+        // Primitive
+        if (info.kind == TypeKind::Primitive) {
+            var kind = info.primitive_kind();
+
+            if (kind == PrimitiveKind::Bool) self.bool(*(ptr as *bool));
+            else if (kind == PrimitiveKind::U8) self.u64(*(ptr as *u8));
+            else if (kind == PrimitiveKind::U16) self.u64(*(ptr as *u16));
+            else if (kind == PrimitiveKind::U32) self.u64(*(ptr as *u32));
+            else if (kind == PrimitiveKind::U64) self.u64(*(ptr as *u64));
+            else if (kind == PrimitiveKind::I8) self.i64(*(ptr as *i8));
+            else if (kind == PrimitiveKind::I16) self.i64(*(ptr as *i16));
+            else if (kind == PrimitiveKind::I32) self.i64(*(ptr as *i32));
+            else if (kind == PrimitiveKind::I64) self.i64(*(ptr as *i64));
+            else if (kind == PrimitiveKind::F32) self.f64(*(ptr as *f32));
+            else if (kind == PrimitiveKind::F64) self.f64(*(ptr as *f64));
+            else panic("Invalid primitive kind");
+
+            return;
+        }
+
+        // Array
+        if (info.kind == TypeKind::Array) {
+            var size = info.array_size();
+            var element = info.element();
+
+            self.array_start();
+
+            for (var i = 0u; i < size; i++) {
+                self.serialize(&(ptr as *u8)[i * element.size], element);
+            }
+
+            self.array_end();
+            return;
+        }
+
+        // Pointer
+        if (info.kind == TypeKind::Pointer) {
+            var value = *(ptr as **void);
+
+            if (value == null) self.null_();
+            else self.serialize(value, info.pointee());
+
+            return;
+        }
+
+        // implements Serialize
+        var vtable = info.get_vtable(typeof(Serialize));
+
+        if (vtable != null) {
+            if (ptr == null) {
+                self.null_();
+                return;
+            }
+
+            var value: Serialize;
+
+            (&value as mut **void)[0] = ptr;
+            (&value as mut **void)[1] = vtable;
+
+            value.serialize(self);
+            return;
+        }
+
+        // Enum
+        if (info.kind == TypeKind::Enum) {
+            var kind = info.enum_underlying().primitive_kind();
+            var cases = info.cases();
+
+            for (var i = 0u; i < cases.size; i++) {
+                var case = cases[i];
+
+                if (kind.is_unsigned_integer()) {
+                    if (kind == PrimitiveKind::U8 && *(ptr as *u8) != case.value) continue;
+                    else if (kind == PrimitiveKind::U16 && *(ptr as *u16) != case.value) continue;
+                    else if (kind == PrimitiveKind::U32 && *(ptr as *u32) != case.value) continue;
+                    else if (kind == PrimitiveKind::U64 && *(ptr as *u64) != case.value) continue;
+                } else {
+                    var value = case.value as i64;
+                    if (case.negative) value = -value;
+
+                    if (kind == PrimitiveKind::I8 && *(ptr as *i8) != value) continue;
+                    else if (kind == PrimitiveKind::I16 && *(ptr as *i16) != value) continue;
+                    else if (kind == PrimitiveKind::I32 && *(ptr as *i32) != value) continue;
+                    else if (kind == PrimitiveKind::I64 && *(ptr as *i64) != value) continue;
+                }
+
+                self.string(case.name);
+                return;
+            }
+
+            panic("Failed to serialize an enum: invalid value");
+        }
+
+        // Struct
+        if (info.kind == TypeKind::Struct) {
+            var fields = info.fields();
+
+            self.object_start();
+
+            for (var i = 0u; i < fields.size; i++) {
+                var field = fields[i];
+                if (!field.public) continue;
+
+                self.property(field.name);
+                self.serialize(&(ptr as *u8)[field.offset], field.type_info);
+            }
+
+            self.object_end();
+            return;
+        }
+
+        // Invalid
+        panic("Failed to serialize type");
+    }
+}
+
+/// Serializes a `value` to the `writer` using `options`.
+pub func serialize_with_options[T](writer: mut io::Writer, opts: Options, value: T) {
+    var se = Serializer::new(writer, opts);
+    se.serialize(&value, typeof(T));
+    se.free();
+}
+
+/// Serializes a `value` to the `writer` using the default options, see `Options::new()`.
+pub func serialize[T](writer: mut io::Writer, value: T) {
+    serialize_with_options:[T](writer, Options {}, value);
+}
+
+// Core implementations
+
+impl StringView : Serialize {
+    pub func serialize(self, se: mut* Serializer) {
+        se.string(*self);
+    }
+}
+
+impl[T] Option[T] : Serialize {
+    pub func serialize(self, se: mut* Serializer) {
+        if (self.is_some()) {
+            var value = self.unwrap();
+            se.serialize(&value, typeof(T));
+            return;
+        }
+
+        se.null_();
+    }
+}
+
+impl[T] Slice[T] : Serialize {
+    pub func serialize(self, se: mut* Serializer) {
+        se.array_start();
+
+        for (var i = 0u; i < self.size; i++) {
+            se.serialize(&self.ptr[i], typeof(T));
+        }
+
+        se.array_end();
+    }
+}
+
+impl[T] MutSlice[T] : Serialize {
+    pub func serialize(self, se: mut* Serializer) {
+        se.array_start();
+
+        for (var i = 0u; i < self.size; i++) {
+            se.serialize(&self.ptr[i], typeof(T));
+        }
+
+        se.array_end();
+    }
+}

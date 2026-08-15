@@ -1,6 +1,7 @@
 mod std;
 
-import std::{ArrayList};
+import std::json::{Serialize, Serializer, Deserialize, Deserializer, TokenKind};
+import std::{ArrayList, String};
 
 pub struct Item[K, V] {
     pub key: K,
@@ -91,5 +92,44 @@ impl[K: Eq[K], V] ArrayMap[K, V] : Index[K] {
         if (!self.try_get(i, &value)) panic("ArrayMap::[] - value not found");
 
         return value;
+    }
+}
+
+impl[K: Eq[K] + ImplicitAs[StringView], V] ArrayMap[K, V] : Serialize {
+    pub func serialize(self, se: mut* Serializer) {
+        se.object_start();
+
+        for (var i = 0u; i < self.size(); i++) {
+            var item = self.items[i];
+
+            se.property(item.key);
+            se.serialize(&item.value, typeof(V));
+        }
+
+        se.object_end();
+    }
+}
+
+impl[V] ArrayMap[String, V] : Deserialize {
+    pub func deserialize(mut self, de: mut* Deserializer) ?bool {
+        de.object_start()?;
+
+        for (;;) {
+            var kind = de.peek()?.kind;
+            if (kind == TokenKind::EOF || kind == TokenKind::ObjectEnd) break;
+
+            var property = de.property()?;
+
+            var key = String::with_capacity(property.text.size);
+            key.write(property.text);
+
+            var value: V;
+            de.deserialize(&value, typeof(V))?;
+
+            self.insert(key, value);
+        }
+
+        de.object_end()?;
+        return true;
     }
 }
