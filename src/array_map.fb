@@ -13,14 +13,24 @@ pub struct ArrayMap[K: Eq[K], V] {
 }
 
 impl[K: Eq[K], V] ArrayMap[K, V] {
-    pub func insert(mut self, key: K, value: V) {
+    func find(self, key: K) mut* V {
         for (var i = 0u; i < self.items.size(); i++) {
             var item = self.items.get_ptr(i);
 
             if (item.key == key) {
-                item.value = value;
-                return;
+                return &item.value;
             }
+        }
+
+        return null;
+    }
+
+    pub func insert(mut self, key: K, value: V) {
+        var ptr = self.find(key);
+
+        if (ptr != null) {
+            *ptr = value;
+            return;
         }
 
         self.items.add(Item:[K, V] {
@@ -53,8 +63,8 @@ impl[K: Eq[K], V] ArrayMap[K, V] {
     }
 
     /// Removes and returns the value for `key`.
-    /// If `key` is absent, returns a default-initialized value.
-    pub func remove(mut self, key: K) V {
+    /// If `key` is absent, returns `None`.
+    pub func remove(mut self, key: K) ?V {
         for (var i = 0u; i < self.items.size(); i++) {
             var item = self.items.get_ptr(i);
 
@@ -65,8 +75,7 @@ impl[K: Eq[K], V] ArrayMap[K, V] {
             }
         }
 
-        var empty: V;
-        return empty;
+        return Option:[V]::none();
     }
 
     pub func size(self) u64 {
@@ -88,10 +97,10 @@ impl[K: Eq[K], V] ArrayMap[K, V] : Index[K] {
     /// Looks up `key`.
     /// Panics if `key` is not present in the map.
     pub func index(self, i: K) V {
-        var value: V;
-        if (!self.try_get(i, &value)) panic("ArrayMap::[] - value not found");
+        var ptr = self.find(i);
+        if (ptr == null) panic("ArrayMap::[] - value not found");
 
-        return value;
+        return *ptr;
     }
 }
 
@@ -110,7 +119,7 @@ impl[K: Eq[K] + ImplicitAs[StringView], V] ArrayMap[K, V] : Serialize {
     }
 }
 
-impl[V] ArrayMap[String, V] : Deserialize {
+impl[V: Zeroable] ArrayMap[String, V] : Deserialize {
     pub func deserialize(mut self, de: mut* Deserializer) ?bool {
         de.object_start()?;
 

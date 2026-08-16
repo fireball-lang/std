@@ -349,7 +349,7 @@ impl Deserializer {
 }
 
 /// Deerializes a `value` from the `reader` using `options`.
-pub func deserialize_with_options[T](reader: mut io::Reader, opts: Options) ?T {
+pub func deserialize_with_options[T: Zeroable](reader: mut io::Reader, opts: Options) ?T {
     var de = Deserializer::new(reader, opts)?;
 
     var value: T;
@@ -363,7 +363,7 @@ pub func deserialize_with_options[T](reader: mut io::Reader, opts: Options) ?T {
 }
 
 /// Deerializes a `value` from the `reader` using the default options, see `Options::new()`.
-pub func deserialize[T](reader: mut io::Reader) ?T {
+pub func deserialize[T: Zeroable](reader: mut io::Reader) ?T {
     return deserialize_with_options:[T](reader, Options {});
 }
 

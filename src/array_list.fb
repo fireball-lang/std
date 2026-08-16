@@ -167,7 +167,7 @@ impl[T] ArrayList[T] : Serialize {
     }
 }
 
-impl[T] ArrayList[T] : Deserialize {
+impl[T: Zeroable] ArrayList[T] : Deserialize {
     pub func deserialize(mut self, de: mut* Deserializer) ?bool {
         de.array_start()?;
 
