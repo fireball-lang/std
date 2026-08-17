@@ -156,7 +156,7 @@ impl[T] ArrayList[T] : ImplicitAs[[]T] {
 }
 
 impl[T] ArrayList[T] : Serialize {
-    pub func serialize(self, se: mut* Serializer) {
+    pub func serialize(self, se: mut& Serializer) {
         se.array_start();
 
         for (var i = 0u; i < self.size; i++) {
@@ -168,7 +168,7 @@ impl[T] ArrayList[T] : Serialize {
 }
 
 impl[T: Zeroable] ArrayList[T] : Deserialize {
-    pub func deserialize(mut self, de: mut* Deserializer) ?bool {
+    pub func deserialize(mut self, de: mut& Deserializer) ?bool {
         de.array_start()?;
 
         for (;;) {

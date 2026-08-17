@@ -9,7 +9,7 @@ import std::io;
 pub interface Deserialize {
     /// Returns `Some(true)` if the value deserialized correctly.
     /// Returns `None` on error, any memory allocations that happened before the error need to be freed before returning.
-    func deserialize(mut self, de: mut* Deserializer) ?bool;
+    func deserialize(mut self, de: mut& Deserializer) ?bool;
 }
 
 pub struct Deserializer {
@@ -235,6 +235,21 @@ impl Deserializer {
             return true;
         }
 
+        // Reference
+        if (info.kind == TypeKind::Reference) {
+            var ptr = ptr as mut* mut& void;
+
+            var pointee = info.pointee();
+            *ptr = malloc(pointee.size) as mut& void;
+
+            if (self.deserialize(*ptr, pointee).is_none()) {
+                free(*ptr);
+                return Option:[bool]::none();
+            }
+
+            return true;
+        }
+
         // Pointer
         if (info.kind == TypeKind::Pointer) {
             var token = self.peek()?;
@@ -370,7 +385,7 @@ pub func deserialize[T: Zeroable](reader: mut io::Reader) ?T {
 // Core implementations
 
 impl[T] Option[T] : Deserialize {
-    func deserialize(mut self, de: mut* Deserializer) ?bool {
+    func deserialize(mut self, de: mut& Deserializer) ?bool {
         var token = de.peek()?;
 
         var has_value = &(self as mut* u8)[offsetof(Option[T], has_value)] as mut* bool;

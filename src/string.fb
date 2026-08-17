@@ -119,13 +119,13 @@ impl String : Display {
 }
 
 impl String : Serialize {
-    pub func serialize(self, se: mut* Serializer) {
+    pub func serialize(self, se: mut& Serializer) {
         se.string(*self);
     }
 }
 
 impl String : Deserialize {
-    func deserialize(mut self, de: mut* Deserializer) ?bool {
+    func deserialize(mut self, de: mut& Deserializer) ?bool {
         self.bytes.clear();
         self.bytes.add_all(de.string()?.text);
 

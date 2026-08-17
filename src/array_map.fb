@@ -39,7 +39,7 @@ impl[K: Eq[K], V] ArrayMap[K, V] {
         });
     }
 
-    pub func try_get(self, key: K, value: mut* V) bool {
+    pub func try_get(self, key: K, value: mut& V) bool {
         for (var i = 0u; i < self.items.size(); i++) {
             var item = self.items.get_ptr(i);
 
@@ -105,7 +105,7 @@ impl[K: Eq[K], V] ArrayMap[K, V] : Index[K] {
 }
 
 impl[K: Eq[K] + ImplicitAs[StringView], V] ArrayMap[K, V] : Serialize {
-    pub func serialize(self, se: mut* Serializer) {
+    pub func serialize(self, se: mut& Serializer) {
         se.object_start();
 
         for (var i = 0u; i < self.size(); i++) {
@@ -120,7 +120,7 @@ impl[K: Eq[K] + ImplicitAs[StringView], V] ArrayMap[K, V] : Serialize {
 }
 
 impl[V: Zeroable] ArrayMap[String, V] : Deserialize {
-    pub func deserialize(mut self, de: mut* Deserializer) ?bool {
+    pub func deserialize(mut self, de: mut& Deserializer) ?bool {
         de.object_start()?;
 
         for (;;) {

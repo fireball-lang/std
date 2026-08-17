@@ -16,7 +16,7 @@ impl Library {
         };
     }
 
-    pub func get(self, name: StringView) ?*void {
+    pub func get(self, name: StringView) ?&void {
         return self.imp.get(name);
     }
 

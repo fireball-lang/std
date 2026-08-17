@@ -36,16 +36,16 @@ impl Library {
         };
     }
 
-    pub func get(self, name: StringView) ?*void {
+    pub func get(self, name: StringView) ?&void {
         var c_name = to_cstring(name);
         var symbol = GetProcAddress(self.module, c_name);
         free(c_name);
 
         if (symbol == null) {
-            return Option:[*void]::none();
+            return Option:[&void]::none();
         }
 
-        return symbol;
+        return symbol as &void;
     }
 
     pub func close(mut self) {

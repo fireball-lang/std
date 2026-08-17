@@ -5,7 +5,7 @@ import std::io;
 
 /// Implement this interface on a type to override the reflection-based serialization.
 pub interface Serialize {
-    func serialize(self, se: mut* Serializer);
+    func serialize(self, se: mut& Serializer);
 }
 
 pub struct Serializer {
@@ -113,6 +113,14 @@ impl Serializer {
             return;
         }
 
+        // Reference
+        if (info.kind == TypeKind::Reference) {
+            var value = *(ptr as *&void);
+            self.serialize(value, info.pointee());
+
+            return;
+        }
+
         // Pointer
         if (info.kind == TypeKind::Pointer) {
             var value = *(ptr as **void);
@@ -209,13 +217,13 @@ pub func serialize[T](writer: mut io::Writer, value: T) {
 // Core implementations
 
 impl StringView : Serialize {
-    pub func serialize(self, se: mut* Serializer) {
+    pub func serialize(self, se: mut& Serializer) {
         se.string(*self);
     }
 }
 
 impl[T] Option[T] : Serialize {
-    pub func serialize(self, se: mut* Serializer) {
+    pub func serialize(self, se: mut& Serializer) {
         if (self.is_some()) {
             var value = self.unwrap();
             se.serialize(&value, typeof(T));
@@ -227,7 +235,7 @@ impl[T] Option[T] : Serialize {
 }
 
 impl[T] Slice[T] : Serialize {
-    pub func serialize(self, se: mut* Serializer) {
+    pub func serialize(self, se: mut& Serializer) {
         se.array_start();
 
         for (var i = 0u; i < self.size; i++) {
@@ -239,7 +247,7 @@ impl[T] Slice[T] : Serialize {
 }
 
 impl[T] MutSlice[T] : Serialize {
-    pub func serialize(self, se: mut* Serializer) {
+    pub func serialize(self, se: mut& Serializer) {
         se.array_start();
 
         for (var i = 0u; i < self.size; i++) {

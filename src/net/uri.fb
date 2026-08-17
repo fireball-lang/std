@@ -91,7 +91,7 @@ impl Uri : Display {
 }
 
 impl Uri : Serialize {
-    pub func serialize(self, se: mut* Serializer) {
+    pub func serialize(self, se: mut& Serializer) {
         var str: String;
 
         self.display(Formatter::new(&str));
@@ -102,7 +102,7 @@ impl Uri : Serialize {
 }
 
 impl Uri : Deserialize {
-    pub func deserialize(mut self, de: mut* Deserializer) ?bool {
+    pub func deserialize(mut self, de: mut& Deserializer) ?bool {
         *self = Uri::parse(de.string()?.text)?;
         return true;
     }
