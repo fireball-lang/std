@@ -77,7 +77,7 @@ impl Serializer {
     // Serialize
 
     /// Serializes a value of type `info` stored inside `ptr`.
-    pub func serialize(mut self, ptr: *void, info: *TypeInfo) {
+    pub func serialize(mut self, ptr: *void, info: &TypeInfo) {
         // Primitive
         if (info.kind == TypeKind::Primitive) {
             var kind = info.primitive_kind();
@@ -142,8 +142,8 @@ impl Serializer {
 
             var value: Serialize;
 
-            (&value as mut **void)[0] = ptr;
-            (&value as mut **void)[1] = vtable;
+            (&value as mut *Interface).data = ptr as mut *void;
+            (&value as mut *Interface).vtable = vtable;
 
             value.serialize(self);
             return;

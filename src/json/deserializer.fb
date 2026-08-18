@@ -155,7 +155,7 @@ impl Deserializer {
     // Deserialize
 
     /// Deserializes a value of type `info` into `ptr` and returns `Some(true)`, otherwise `None` on error.
-    pub func deserialize(mut self, ptr: mut* void, info: *TypeInfo) ?bool {
+    pub func deserialize(mut self, ptr: mut* void, info: &TypeInfo) ?bool {
         // Primitive
         if (info.kind == TypeKind::Primitive) {
             var kind = info.primitive_kind();
@@ -284,8 +284,8 @@ impl Deserializer {
 
             var value: mut Deserialize;
 
-            (&value as mut **void)[0] = ptr;
-            (&value as mut **void)[1] = vtable;
+            (&value as mut *Interface).data = ptr;
+            (&value as mut *Interface).vtable = vtable;
 
             return value.deserialize(self);
         }
