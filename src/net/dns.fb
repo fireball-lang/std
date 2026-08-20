@@ -19,7 +19,7 @@ pub func resolve_domain(domain: StringView, buffer: mut [][4]u8) u32 {
     var ret = getaddrinfo(domain_cstr, null, &hints, &results);
     free(domain_cstr);
 
-    if (ret != 0) return 0u;
+    if (ret != 0) return 0;
 
     var entry = results;
     var count = 0u;

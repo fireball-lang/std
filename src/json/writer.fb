@@ -73,7 +73,7 @@ impl Writer {
         self.writer.write("\"");
         self.writer.write(name);
 
-        if (self.indent.size > 0u) {
+        if (self.indent.size > 0) {
             self.writer.write("\": ");
         } else {
             self.writer.write("\":");
@@ -111,7 +111,7 @@ impl Writer {
             self.item();
         }
 
-        format_f64(self.writer, value, FloatMode::General, 64u);
+        format_f64(self.writer, value, FloatMode::General, 64);
     }
 
     pub func bool(mut self, value: bool) {
@@ -165,7 +165,7 @@ impl Writer {
     }
 
     func new_line(mut self) {
-        if (self.indent.size == 0u) return;
+        if (self.indent.size == 0) return;
 
         self.writer.write("\n");
 

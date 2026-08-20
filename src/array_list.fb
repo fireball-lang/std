@@ -20,8 +20,8 @@ impl[T] ArrayList[T] {
     pub func ensure_capacity(mut self, additional_size: u64) {
         if (self.size + additional_size <= self.capacity) return;
 
-        var new_capacity = self.capacity * 2u;
-        if (new_capacity == 0u) new_capacity = 8u;
+        var new_capacity = self.capacity * 2;
+        if (new_capacity == 0) new_capacity = 8;
         if (new_capacity < self.size + additional_size) new_capacity = self.size + additional_size;
 
         var new_ptr = malloc(new_capacity * sizeof(T)) as mut* T;
@@ -36,7 +36,7 @@ impl[T] ArrayList[T] {
     }
 
     pub func add(mut self, item: T) {
-        self.ensure_capacity(1u);
+        self.ensure_capacity(1);
         self.ptr[self.size++] = item;
     }
 
@@ -48,13 +48,13 @@ impl[T] ArrayList[T] {
     }
 
     pub func first(self) ?T {
-        if (self.size == 0u) return Option:[T]::none();
-        return self.ptr[0u];
+        if (self.size == 0) return Option:[T]::none();
+        return self.ptr[0];
     }
 
     pub func last(self) ?T {
-        if (self.size == 0u) return Option:[T]::none();
-        return self.ptr[self.size - 1u];
+        if (self.size == 0) return Option:[T]::none();
+        return self.ptr[self.size - 1];
     }
 
     pub func remove(mut self, index: u64) T {
@@ -64,22 +64,22 @@ impl[T] ArrayList[T] {
 
         var item = self.ptr[index];
 
-        if (index < self.size - 1u) memmove(&self.ptr[index], &self.ptr[index + 1u], (self.size - index - 1u) * sizeof(T));
+        if (index < self.size - 1) memmove(&self.ptr[index], &self.ptr[index + 1u], (self.size - index - 1u) * sizeof(T));
         self.size--;
 
         return item;
     }
 
     pub func remove_first(mut self) T {
-        return self.remove(0u);
+        return self.remove(0);
     }
 
     pub func remove_last(mut self) T {
-        return self.remove(self.size - 1u);
+        return self.remove(self.size - 1);
     }
 
     pub func clear(mut self) {
-        self.size = 0u;
+        self.size = 0;
     }
 
     pub func size(self) u64 {
@@ -100,8 +100,8 @@ impl[T] ArrayList[T] {
         free(self.ptr);
 
         self.ptr = null;
-        self.size = 0u;
-        self.capacity = 0u;
+        self.size = 0;
+        self.capacity = 0;
     }
 
     pub func as_mut_slice(mut self) mut []T {

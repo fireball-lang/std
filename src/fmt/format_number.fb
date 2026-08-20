@@ -12,13 +12,13 @@ pub func format_u64(w: mut Writer, value: u64) {
     var len = 0u;
 
     for (;;) {
-        buffer[len++] = '0' + (value % 10u) as u8;
-        value /= 10u;
+        buffer[len++] = '0' + (value % 10) as u8;
+        value /= 10;
 
-        if (value == 0u) break;
+        if (value == 0) break;
     }
 
-    var slice = (buffer as mut []u8).slice(0u, len);
+    var slice = (buffer as mut []u8).slice(0, len);
     slice.reverse();
 
     w.write(slice);
@@ -29,7 +29,7 @@ pub func format_i64(w: mut Writer, value: i64) {
 
     if (value < 0) {
         w.write("-");
-        uval = (uval ^ 18446744073709551615u) + 1u;
+        uval = (uval ^ 18446744073709551615u) + 1;
     }
 
     format_u64(w, uval);
@@ -58,8 +58,8 @@ pub func format_f64(w: mut Writer, value: f64, mode: FloatMode, precision: u32) 
     }
 
     // Cap precision to a maximum of 64 digits
-    if (precision > 64u) {
-        precision = 64u;
+    if (precision > 64) {
+        precision = 64;
     }
 
     // 3. Normalize for Scientific Notation (Levels 1 & 2)
@@ -73,7 +73,7 @@ pub func format_f64(w: mut Writer, value: f64, mode: FloatMode, precision: u32) 
             use_scientific = true;
             while (value >= 10.0) {
                 value /= 10.0;
-                exp_val += 1u;
+                exp_val += 1;
             }
         }
         // Lower threshold: 0.0001
@@ -82,7 +82,7 @@ pub func format_f64(w: mut Writer, value: f64, mode: FloatMode, precision: u32) 
             exp_neg = true;
             while (value < 1.0) {
                 value *= 10.0;
-                exp_val += 1u;
+                exp_val += 1;
             }
         }
     }
@@ -99,13 +99,13 @@ pub func format_f64(w: mut Writer, value: f64, mode: FloatMode, precision: u32) 
     if (use_scientific && value >= 10.0) {
         value /= 10.0;
         if (exp_neg) {
-            exp_val -= 1u;
+            exp_val -= 1;
             // Rare edge case: 0.999... rounded to 1.0 makes exponent 0
-            if (exp_val == 0u) {
+            if (exp_val == 0) {
                 use_scientific = false;
             }
         } else {
-            exp_val += 1u;
+            exp_val += 1;
         }
     }
 
@@ -117,7 +117,7 @@ pub func format_f64(w: mut Writer, value: f64, mode: FloatMode, precision: u32) 
     format_u64(w, int_part);
 
     // 7. Extract Fractional Digits
-    if (precision > 0u) {
+    if (precision > 0) {
         var buffer: [64]u8;
         var last_non_zero = 0u;
         var has_non_zero = false;
@@ -126,14 +126,14 @@ pub func format_f64(w: mut Writer, value: f64, mode: FloatMode, precision: u32) 
             frac_part *= 10.0;
             var digit = frac_part as u64;
 
-            if (digit > 9u) {
-                digit = 9u;
+            if (digit > 9) {
+                digit = 9;
             }
 
             buffer[i] = '0' + (digit as u8);
 
-            if (digit != 0u) {
-                last_non_zero = i + 1u;
+            if (digit != 0) {
+                last_non_zero = i + 1;
                 has_non_zero = true;
             }
 
@@ -143,12 +143,12 @@ pub func format_f64(w: mut Writer, value: f64, mode: FloatMode, precision: u32) 
         if (mode == FloatMode::Fixed) {
             // Always print the dot and the exact number of requested digits
             w.write(".");
-            var slice = (buffer as mut []u8).slice(0u, precision);
+            var slice = (buffer as mut []u8).slice(0, precision);
             w.write(slice);
         } else if (has_non_zero) {
             // Only print up to the last meaningful non-zero digit
             w.write(".");
-            var slice = (buffer as mut []u8).slice(0u, last_non_zero);
+            var slice = (buffer as mut []u8).slice(0, last_non_zero);
             w.write(slice);
         }
     }

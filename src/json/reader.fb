@@ -66,7 +66,7 @@ impl Reader {
         }
 
         // } | ]
-        if (self.entities.size() > 0u && ch == entity.kind.ending_ch()) {
+        if (self.entities.size() > 0 && ch == entity.kind.ending_ch()) {
             var kind = TokenKind::ObjectEnd;
             if (entity.kind == EntityKind::Array) kind = TokenKind::ArrayEnd;
 
@@ -79,7 +79,7 @@ impl Reader {
         }
 
         // "...":
-        if (self.entities.size() > 0u && entity.property) {
+        if (self.entities.size() > 0 && entity.property) {
             // "..."
             if (ch != '"') {
                 return Option:[Token]::none();
@@ -98,7 +98,7 @@ impl Reader {
             self.advance(false)?;
             self.skip_whitespace()?;
 
-            self.entities.get_ptr(self.entities.size() - 1u).property = false;
+            self.entities.get_ptr(self.entities.size() - 1).property = false;
 
             return token;
         }
@@ -151,7 +151,7 @@ impl Reader {
     }
 
     func comma(mut self) ?bool {
-        if (self.entities.size() == 0u) {
+        if (self.entities.size() == 0) {
             return true;
         }
 
@@ -165,7 +165,7 @@ impl Reader {
                 return Option:[bool]::none();
             }
 
-            var entity = self.entities.get_ptr(self.entities.size() - 1u);
+            var entity = self.entities.get_ptr(self.entities.size() - 1);
             if (entity.kind == EntityKind::Object) entity.property = true;
 
             return true;
@@ -179,7 +179,7 @@ impl Reader {
     }
 
     func string(mut self) ?Token {
-        while (self.current != '"' && self.current != '\n' && self.current != 0u) {
+        while (self.current != '"' && self.current != '\n' && self.current != 0) {
             if (self.current != '\\') {
                 self.advance(true)?;
                 continue;
@@ -250,7 +250,7 @@ impl Reader {
             return Option:[Token]::none();
         }
 
-        if (self.current == 0u || self.current == '\n') {
+        if (self.current == 0 || self.current == '\n') {
             return Option:[Token]::none();
         }
 
@@ -335,7 +335,7 @@ impl Reader {
         var text = self.buffer as []u8;
 
         if (kind == TokenKind::String) {
-            text = text.slice(1u, text.size - 1u);
+            text = text.slice(1, text.size - 1);
         }
 
         return Token {
@@ -371,7 +371,7 @@ impl Reader {
 
                 var depth = 1;
 
-                while (self.current != 0u && depth > 0) {
+                while (self.current != 0 && depth > 0) {
                     // /*
                     if (self.current == '/' && self.next == '*') {
                         self.advance(false)?;
@@ -407,16 +407,16 @@ impl Reader {
     func advance(mut self, add_to_buffer: bool) ?u8 {
         var old = self.current;
 
-        if (add_to_buffer && old != 0u) {
+        if (add_to_buffer && old != 0) {
             self.buffer.add(old);
         }
 
         self.current = self.next;
 
-        var byte: u8 = 0u;
-        var read = self.reader.read(MutSlice:[u8] { ptr: &byte, size: 1u })?;
+        var byte: u8 = 0;
+        var read = self.reader.read(MutSlice:[u8] { ptr: &byte, size: 1 })?;
         self.next = byte;
-        if (read == 0u) self.next = 0u;
+        if (read == 0) self.next = 0;
 
         return old;
     }

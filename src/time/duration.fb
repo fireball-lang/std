@@ -136,11 +136,11 @@ impl Duration : Display {
         // if it exists, then exit early.
 
         // --- HOURS SCALE ---
-        if (hours > 0u) {
+        if (hours > 0) {
             fmt.u64(hours);
             fmt.str("h");
 
-            if (minutes > 0u) {
+            if (minutes > 0) {
                 fmt.str(" ");
                 fmt.u64(minutes);
                 fmt.str("m");
@@ -150,11 +150,11 @@ impl Duration : Display {
         }
 
         // --- MINUTES SCALE ---
-        if (minutes > 0u) {
+        if (minutes > 0) {
             fmt.u64(minutes);
             fmt.str("m");
 
-            if (seconds > 0u) {
+            if (seconds > 0) {
                 fmt.str(" ");
                 fmt.u64(seconds);
                 fmt.str("s");
@@ -164,12 +164,12 @@ impl Duration : Display {
         }
 
         // --- SECONDS SCALE ---
-        if (seconds > 0u) {
+        if (seconds > 0) {
             fmt.u64(seconds);
             fmt.str("s");
 
             // Only show milliseconds if it's less than a minute total
-            if (millis > 0u) {
+            if (millis > 0) {
                 fmt.str(" ");
                 fmt.u64(millis);
                 fmt.str("ms");
@@ -179,11 +179,11 @@ impl Duration : Display {
         }
 
         // --- MILLISECONDS SCALE ---
-        if (millis > 0u) {
+        if (millis > 0) {
             fmt.u64(millis);
             fmt.str("ms");
             // Threshold: Only show micros if under 100ms
-            if (millis < 100u && micros > 0u) {
+            if (millis < 100 && micros > 0) {
                 fmt.str(" ");
                 fmt.u64(micros);
                 fmt.str("us");
@@ -192,12 +192,12 @@ impl Duration : Display {
         }
 
         // --- MICROSECONDS SCALE ---
-        if (micros > 0u) {
+        if (micros > 0) {
             fmt.u64(micros);
             fmt.str("us");
 
             // Threshold: Only show nanos if under 100us (0.1ms)
-            if (micros < 100u && nanos > 0u) {
+            if (micros < 100 && nanos > 0) {
                 fmt.str(" ");
                 fmt.u64(nanos);
                 fmt.str("ns");
@@ -207,7 +207,7 @@ impl Duration : Display {
         }
 
         // --- NANOSECONDS SCALE ---
-        if (nanos > 0u) {
+        if (nanos > 0) {
             fmt.u64(nanos);
             fmt.str("ns");
             return;
@@ -220,11 +220,11 @@ impl Duration : Add[Duration] {
 
     pub func add(self, rhs: Duration) Duration {
         var total_nanos = self.nanos + rhs.nanos;
-        var carry_sec = 0u as u64;
+        var carry_sec = 0 as u64;
 
         if (total_nanos >= NANOS_PER_SEC) {
             total_nanos = total_nanos - NANOS_PER_SEC;
-            carry_sec = 1u;
+            carry_sec = 1;
         }
 
         var total_secs = self.secs + rhs.secs + carry_sec;
@@ -238,10 +238,10 @@ impl Duration : Sub[Duration] {
 
     pub func sub(self, rhs: Duration) Duration {
         var final_secs = self.secs - rhs.secs;
-        var final_nanos = 0u as u32;
+        var final_nanos = 0 as u32;
 
         if (self.nanos < rhs.nanos) {
-            final_secs = final_secs - 1u;
+            final_secs = final_secs - 1;
             final_nanos = (self.nanos + NANOS_PER_SEC) - rhs.nanos;
         } else {
             final_nanos = self.nanos - rhs.nanos;
@@ -255,8 +255,8 @@ impl Duration : Mul[u32] {
     type Result = Duration;
 
     pub func mul(self, rhs: u32) Duration {
-        if (rhs == 0u) {
-            return Duration { secs: 0u, nanos: 0u };
+        if (rhs == 0) {
+            return Duration { secs: 0, nanos: 0 };
         }
 
         // 1. Multiply nanos
@@ -279,7 +279,7 @@ impl Duration : Div[u32] {
     type Result = Duration;
 
     pub func div(self, rhs: u32) Duration {
-        if (rhs == 0u) {
+        if (rhs == 0) {
             panic("Attempted to divide Duration by zero");
         }
 

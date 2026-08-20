@@ -5,7 +5,7 @@ mod std::fmt;
 /// Returns `None` if the value does not fit or the string is invalid.
 pub func parse_u64(str: StringView, bits: u32) ?u64 {
     // Validate
-    if (str.size == 0u || bits == 0u || bits > 64u) {
+    if (str.size == 0 || bits == 0 || bits > 64) {
         return Option:[u64]::none();
     }
 
@@ -14,7 +14,7 @@ pub func parse_u64(str: StringView, bits: u32) ?u64 {
 
     // Check range
     var max_val = 18446744073709551615u;
-    if (bits != 64u) max_val = ((1u as u64) << bits) - 1u;
+    if (bits != 64) max_val = ((1u as u64) << bits) - 1;
 
     if (value > max_val) {
         return Option:[u64]::none();
@@ -28,19 +28,19 @@ pub func parse_u64(str: StringView, bits: u32) ?u64 {
 /// Returns `None` if the value does not fit or the string is invalid.
 pub func parse_i64(str: StringView, bits: u32) ?i64 {
     // Validate
-    if (str.size == 0u || bits == 0u || bits > 64u) {
+    if (str.size == 0 || bits == 0 || bits > 64) {
         return Option:[i64]::none();
     }
 
     // Parse sign
     var is_negative = false;
 
-    if (str[0u] == '-') {
+    if (str[0] == '-') {
         is_negative = true;
         str = str.slice(1u, str.size);
     }
 
-    if (str.size == 0u) {
+    if (str.size == 0) {
         return Option:[i64]::none();
     }
 
@@ -49,12 +49,12 @@ pub func parse_i64(str: StringView, bits: u32) ?i64 {
 
     // Check range
     var max_val: i64 = 9223372036854775807;
-    if (bits != 64u)  max_val = ((1 as i64) << (bits as i64 - 1)) - 1;
+    if (bits != 64)  max_val = ((1 as i64) << (bits as i64 - 1)) - 1;
 
     var min_val: i64 = -9223372036854775807 - 1;
-    if (bits != 64u)  min_val = -((1 as i64) << (bits as i64 - 1));
+    if (bits != 64)  min_val = -((1 as i64) << (bits as i64 - 1));
 
-    var abs_max = max_val as u64 + 1u;
+    var abs_max = max_val as u64 + 1;
     if (!is_negative) abs_max = (max_val as u64);
 
     if (value > abs_max) {
@@ -81,7 +81,7 @@ pub func parse_i64(str: StringView, bits: u32) ?i64 {
 /// Supports integer and fractional parts as well as scientific notation (e.g. '5.5', '-1e3').
 /// Returns `None` if the string is invalid.
 pub func parse_f64(str: StringView) ?f64 {
-    if (str.size == 0u) {
+    if (str.size == 0) {
         return Option:[f64]::none();
     }
 
@@ -91,9 +91,9 @@ pub func parse_f64(str: StringView) ?f64 {
     // Parse sign
     if (str[i] == '-') {
         is_negative = true;
-        i += 1u;
+        i += 1;
     } else if (str[i] == '+') {
-        i += 1u;
+        i += 1;
     }
 
     if (i == str.size) {
@@ -109,7 +109,7 @@ pub func parse_f64(str: StringView) ?f64 {
         if (ch >= '0' && ch <= '9') {
             int_part = (int_part * 10.0) + ((ch - '0') as f64);
             has_int_digits = true;
-            i += 1u;
+            i += 1;
         } else {
             break;
         }
@@ -121,7 +121,7 @@ pub func parse_f64(str: StringView) ?f64 {
     var has_frac_digits = false;
 
     if (i < str.size && str[i] == '.') {
-        i += 1u; // Skip '.'
+        i += 1; // Skip '.'
 
         while (i < str.size) {
             var ch = str[i];
@@ -129,7 +129,7 @@ pub func parse_f64(str: StringView) ?f64 {
                 frac_divisor *= 10.0;
                 frac_part = (frac_part * 10.0) + ((ch - '0') as f64);
                 has_frac_digits = true;
-                i += 1u;
+                i += 1;
             } else {
                 break;
             }
@@ -145,7 +145,7 @@ pub func parse_f64(str: StringView) ?f64 {
 
     // Parse Exponent (e.g. e-5, E10)
     if (i < str.size && (str[i] == 'e' || str[i] == 'E')) {
-        i += 1u;
+        i += 1;
 
         if (i == str.size) {
             return Option:[f64]::none();
@@ -154,9 +154,9 @@ pub func parse_f64(str: StringView) ?f64 {
         var exp_negative = false;
         if (str[i] == '-') {
             exp_negative = true;
-            i += 1u;
+            i += 1;
         } else if (str[i] == '+') {
-            i += 1u;
+            i += 1;
         }
 
         var exp_val = 0u;
@@ -166,11 +166,11 @@ pub func parse_f64(str: StringView) ?f64 {
             var ch = str[i];
             if (ch >= '0' && ch <= '9') {
                 // Prevent extreme overflow loops on massive exponent inputs
-                if (exp_val < 1000u) {
-                    exp_val = (exp_val * 10u) + ((ch - '0') as u32);
+                if (exp_val < 1000) {
+                    exp_val = (exp_val * 10) + ((ch - '0') as u32);
                 }
                 has_exp_digits = true;
-                i += 1u;
+                i += 1;
             } else {
                 break;
             }
@@ -186,11 +186,11 @@ pub func parse_f64(str: StringView) ?f64 {
         var exp_int = exp_val;
 
         while (exp_int > 0u) {
-            if ((exp_int % 2u) != 0u) {
+            if ((exp_int % 2) != 0u) {
                 multiplier *= base;
             }
             base *= base;
-            exp_int /= 2u;
+            exp_int /= 2;
         }
 
         if (exp_negative) {
@@ -214,7 +214,7 @@ pub func parse_f64(str: StringView) ?f64 {
 }
 
 func parse_u64_raw(str: StringView) ?u64 {
-    var value: u64 = 0u;
+    var value: u64 = 0;
 
     for (var i = 0u; i < str.size; i++) {
         var ch = str[i];
@@ -225,11 +225,11 @@ func parse_u64_raw(str: StringView) ?u64 {
 
         var digit = (ch - '0') as u64;
 
-        if (value > (18446744073709551615u - digit) / 10u) {
+        if (value > (18446744073709551615u - digit) / 10) {
             return Option:[u64]::none();
         }
 
-        value = (value * 10u) + digit;
+        value = (value * 10) + digit;
     }
 
     return value;

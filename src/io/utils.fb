@@ -8,9 +8,9 @@ pub func copy(src: mut Reader, dst: mut Writer) ?u64 {
 
     for (;;) {
         var size = src.read(buffer)?;
-        if (size == 0u) break;
+        if (size == 0) break;
 
-        dst.write((buffer as []u8).slice(0u, size));
+        dst.write((buffer as []u8).slice(0, size));
     }
 
     return total;
