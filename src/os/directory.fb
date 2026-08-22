@@ -1,0 +1,87 @@
+mod std::os;
+
+import std::os::{FileKind, FileInfo};
+
+#[cfg(target_family = "windows")]
+import std::os::windows as imp;
+#[cfg(target_family = "unix")]
+import std::os::unix as imp;
+
+/// Creates a directory at `path`.
+/// Returns `Some(true)` on success and `None` on error.
+pub func create_dir(path: StringView) ?bool {
+    return imp::create_dir(path);
+}
+
+/// Deletes a directory at `path`. The directory needs to be empty, otherwise it is an error.
+/// Returns `Some(true)` on success and `None` on error.
+pub func delete_dir(path: StringView) ?bool {
+    return imp::delete_dir(path);
+}
+
+/// Single entry of a directory.
+pub struct DirEntry {
+    /// The kind of the entry.
+    pub kind: FileKind,
+
+    /// The name of the entry.
+    /// This string view is only valid until the next call to `DirIterator.next()`.
+    pub name: StringView,
+
+    iter: &imp::DirIterator,
+    info: imp::DirEntryInfo,
+}
+
+impl DirEntry {
+    /// Returns a `FileInfo` for the associated entry or `None` if there was an error.
+    /// On Windows this is a no-op and will never fail.
+    /// On Linux / MacOS this will do a `stat()` call and cache it for subsequent calls.
+    pub func info(mut self) ?FileInfo {
+        return self.info.get(self.iter, self.name);
+    }
+
+    /// Returns true if this entry is a `FileKind::File`.
+    pub func is_file(self) bool {
+        return self.kind == FileKind::File;
+    }
+
+    /// Returns true if this entry is a `FileKind::Directory`.
+    pub func is_dir(self) bool {
+        return self.kind == FileKind::Directory;
+    }
+
+    /// Returns true if this entry is a `FileKind::Symlink`.
+    pub func is_symlink(self) bool {
+        return self.kind == FileKind::Symlink;
+    }
+}
+
+pub struct DirIterator {
+    inner: imp::DirIterator,
+}
+
+/// Returns an iterator for the children of the directory or `None` if there was an error.
+pub func list_dir(path: StringView) ?DirIterator {
+    return DirIterator {
+        inner: imp::list_dir(path)?,
+    };
+}
+
+impl DirIterator {
+    /// Returns the next child of the directory or `None` if there are no more children.
+    /// Calling this method invalidates the `DirEntry.name` of any previously returned entries.
+    pub func next(mut self) ?DirEntry {
+        var kind: FileKind;
+        var info: imp::DirEntryInfo;
+        var name = self.inner.next(&kind, &info);
+
+        if (name == "") return Option:[DirEntry]::none();
+
+        return DirEntry {
+            kind: kind,
+            name: name,
+            iter: &self.inner,
+            info: info,
+        };
+    }
+}

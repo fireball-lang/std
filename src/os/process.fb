@@ -1,0 +1,162 @@
+mod std::os;
+
+import std::{ArrayList, ArrayMap, String};
+import std::io::{Reader, Writer};
+import std::os::{lookup_path};
+
+#[cfg(target_family="windows")]
+import std::os::windows as imp;
+#[cfg(target_family="unix")]
+import std::os::unix as imp;
+
+/// Controls the standard IO of a new process.
+/// Defaults to `Stdio::Null`.
+pub enum Stdio {
+    /// Discard the stream.
+    Null,
+
+    /// Inherits the stream from the parent process.
+    Inherit,
+
+    /// Creates a new pipe the parent process can access.
+    Pipe,
+}
+
+/// Used to spawn a new process using `spawn`.
+pub struct ProcessInfo {
+    /// The program to spawn.
+    /// If the value doesn't contain any path separators,
+    /// then the program is resolved from %PATH% by calling `std::os::lookup_path`.
+    pub program: StringView,
+
+    /// Arguments to pass to the program.
+    /// The `spawn` function automatically adds the program as the first argument.
+    pub args: ArrayList[StringView],
+
+    /// Sets the current working directory for the new process,
+    /// or inherits it from the parent process if empty.
+    pub cwd: StringView,
+
+    /// Sets the environment variables for the new process,
+    /// or inherits them from the parent process if empty.
+    pub env: ArrayMap[StringView, StringView],
+
+    /// Controls the standard input of the new process.
+    /// When `Stdio::Pipe`, the `Process.stdin` field will be set.
+    pub stdin: Stdio,
+
+    /// Controls the standard output of the new process.
+    /// When `Stdio::Pipe`, the `Process.stdin` field will be set.
+    pub stdout: Stdio,
+
+    /// Controls the standard error of the new process.
+    /// When `Stdio::Pipe`, the `Process.stdin` field will be set.
+    pub stderr: Stdio,
+}
+
+impl ProcessInfo {
+    pub func free(mut self) {
+        self.args.free();
+        self.env.free();
+    }
+}
+
+/// Represents the exit status of a spawned process.
+pub struct ExitStatus {
+    /// Raw exit code returned by the OS.
+    pub raw: u32,
+}
+
+#[cfg(target_family="windows")]
+impl ExitStatus {
+    /// Returns the exit code if the process exited normally.
+    /// Returns `None` if the process was terminated by an OS signal.
+    pub func code(self) ?u32 {
+        return self.raw;
+    }
+
+    /// Returns the signal number that terminated the process, if any.
+    /// On Windows, this always returns `None`.
+    pub func signal(self) ?u32 {
+        return Option:[u32]::none();
+    }
+}
+
+#[cfg(target_family="unix")]
+impl ExitStatus {
+    /// Returns the exit code if the process exited normally.
+    /// Returns `None` if the process was terminated by an OS signal.
+    pub func code(self) ?u32 {
+        if ((self.raw & 0x7F) == 0) {
+            return (self.raw >> 8) & 0xFF;
+        }
+
+        return Option:[u32]::none();
+    }
+
+    /// Returns the signal number that terminated the process, if any.
+    /// On Windows, this always returns `None`.
+    pub func signal(self) ?u32 {
+        var sig = self.raw & 0x7F;
+        if (sig != 0 && sig != 0x7F) {
+            return sig;
+        }
+
+        return Option:[u32]::none();
+    }
+}
+
+impl ExitStatus {
+    /// Returns true if the process exited normally with a code of 0.
+    pub func success(self) bool {
+        return self.code() or 1 == 0;
+    }
+}
+
+/// Represents a newly spawned process.
+pub struct Process {
+    /// OS specific identifier for the process.
+    pub id: u64,
+
+    /// Only set to a valid FD if `ProcessInfo.stdin` was `Stdio::Pipe`.
+    pub stdin: imp::Fd,
+
+    /// Only set to a valid FD if `ProcessInfo.stdout` was `Stdio::Pipe`.
+    pub stdout: imp::Fd,
+
+    /// Only set to a valid FD if `ProcessInfo.stderr` was `Stdio::Pipe`.
+    pub stderr: imp::Fd,
+}
+
+impl Process {
+    /// Suspends the calling process until the process `self` exists and returns the exit status.
+    pub func wait(self) ?ExitStatus {
+        return imp::wait(self.id);
+    }
+
+    /// Closes FDs associated with the process.
+    pub func close(mut self) {
+        self.stderr.close();
+        self.stdout.close();
+        self.stdin.close();
+    }
+}
+
+pub func spawn(info: ProcessInfo) ?Process {
+    var path_opt: ?String;
+
+    if (!info.program.contains("/") && !info.program.contains("\\")) {
+        path_opt = lookup_path(info.program);
+        if (path_opt.is_none()) return Option:[Process]::none();
+
+        info.program = path_opt.unwrap();
+    }
+
+    var result = imp::spawn(info);
+
+    if (path_opt.is_some()) {
+        path_opt.unwrap().free();
+    }
+
+    return result;
+}

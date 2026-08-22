@@ -1,11 +1,41 @@
 mod std::os;
 
 #[cfg(target_family = "windows")]
-import std::os::windows::{Fd};
+import std::os::windows as imp;
 #[cfg(target_family = "unix")]
-import std::os::unix::{Fd};
+import std::os::unix as imp;
 
+import std::c::{to_cstring, free};
 import std::io::{Reader, Writer};
+
+pub enum FileKind {
+    File,
+    Directory,
+    Symlink,
+    Other,
+}
+
+pub struct FileInfo {
+    pub kind: FileKind,
+    pub size: u64,
+}
+
+impl FileInfo {
+    /// Returns true if this info is a `FileKind::File`.
+    pub func is_file(self) bool {
+        return self.kind == FileKind::File;
+    }
+
+    /// Returns true if this info is a `FileKind::Directory`.
+    pub func is_dir(self) bool {
+        return self.kind == FileKind::Directory;
+    }
+
+    /// Returns true if this info is a `FileKind::Symlink`.
+    pub func is_symlink(self) bool {
+        return self.kind == FileKind::Symlink;
+    }
+}
 
 pub enum Seek {
     Start = 0,
@@ -14,28 +44,36 @@ pub enum Seek {
 }
 
 pub struct File {
-    fd: Fd,
+    fd: imp::Fd,
     open: bool,
 }
 
 impl File {
+    pub func info(path: StringView) ?FileInfo {
+        var c_path = to_cstring(path);
+        var result = imp::stat(c_path);
+        free(c_path);
+
+        return result;
+    }
+
     pub func create(path: StringView) ?Self {
         return File {
-            fd: Fd::create(path)?,
+            fd: imp::Fd::create(path)?,
             open: true,
         };
     }
 
     pub func open(path: StringView) ?Self {
         return File {
-            fd: Fd::open(path)?,
+            fd: imp::Fd::open(path)?,
             open: true,
         };
     }
 
     /// Wraps an existing `Fd`, taking ownership of it.
     /// The caller must not close the `Fd` afterwards.
-    pub func from_fd(fd: Fd) Self {
+    pub func from_fd(fd: imp::Fd) Self {
         return File {
             fd: fd,
             open: true,

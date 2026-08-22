@@ -1,0 +1,198 @@
+#[cfg(target_family = "unix")]
+
+mod std::os::unix;
+
+import std::os::{Stdio, ProcessInfo, Process, ExitStatus};
+import std::c::{to_cstring, malloc, free, memcpy, exit};
+import std::os::unix::{Fd};
+import std::os::unix::api;
+
+#[extern, link_name("environ")]
+var environ: **u8;
+
+pub func spawn(info: ProcessInfo) ?Process {
+    // Allocate file
+    var file = to_cstring(info.program);
+
+    // Allocate argv
+    var argv = malloc(sizeof(*u8) * (1 + info.args.size() + 1)) as mut **u8;
+
+    argv[0] = file;
+
+    for (var i = 0u; i < info.args.size(); i++) {
+        argv[1 + i] = to_cstring(info.args[i]);
+    }
+
+    argv[1 + info.args.size()] = null;
+
+    // Allocate cwd
+    var cwd: *u8;
+
+    if (info.cwd != "") {
+        cwd = to_cstring(info.cwd);
+    }
+
+    // Allocate envp
+    var envp = environ as mut **u8;
+
+    if (info.env.size() > 0) {
+        envp = malloc(sizeof(*u8) * (info.env.size() + 1)) as mut **u8;
+
+        for (var i = 0u; i < info.env.size(); i++) {
+            var item = info.env.get_at(i);
+            var str = malloc(item.key.size + 1 + item.value.size + 1) as mut *u8;
+
+            memcpy(&str[0], item.key.ptr, item.key.size);
+            str[item.key.size] = '=';
+            memcpy(&str[item.key.size + 1], item.value.ptr, item.value.size);
+            str[item.key.size + 1 + item.value.size] = 0;
+
+            envp[i] = str;
+        }
+
+        envp[info.env.size()] = null;
+    }
+
+    // Pipes
+    var stdin_pipes: [2]i32;
+    if (info.stdin == Stdio::Pipe) api::pipe(&stdin_pipes[0]);
+
+    var stdout_pipes: [2]i32;
+    if (info.stdout == Stdio::Pipe) api::pipe(&stdout_pipes[0]);
+
+    var stderr_pipes: [2]i32;
+    if (info.stderr == Stdio::Pipe) api::pipe(&stderr_pipes[0]);
+
+    // Fork process
+    var result: ?Process;
+    var pid = api::fork();
+
+    if (pid != -1) {
+        // Child
+        if (pid == 0) {
+            if (cwd != null) {
+                if (api::chdir(cwd) == -1) exit(1);
+            }
+
+            if (info.stdin == Stdio::Null) {
+                var fd = api::open("/dev/null".ptr, api::FileFlags::ReadOnly);
+                api::dup2(fd, 0);
+                api::close(fd);
+            }
+            else if (info.stdin == Stdio::Pipe) {
+                api::dup2(stdin_pipes[0], 0);
+                if (stdin_pipes[0] != 0) api::close(stdin_pipes[0]);
+                api::close(stdin_pipes[1]);
+            }
+
+            if (info.stdout == Stdio::Null) {
+                var fd = api::open("/dev/null".ptr, api::FileFlags::WriteOnly);
+                api::dup2(fd, 1);
+                api::close(fd);
+            }
+            else if (info.stdout == Stdio::Pipe) {
+                api::dup2(stdout_pipes[1], 1);
+                api::close(stdout_pipes[0]);
+                if (stdout_pipes[1] != 1) api::close(stdout_pipes[1]);
+            }
+
+            if (info.stderr == Stdio::Null) {
+                var fd = api::open("/dev/null".ptr, api::FileFlags::WriteOnly);
+                api::dup2(fd, 2);
+                api::close(fd);
+            }
+            else if (info.stderr == Stdio::Pipe) {
+                api::dup2(stderr_pipes[1], 2);
+                api::close(stderr_pipes[0]);
+                if (stderr_pipes[1] != 2) api::close(stderr_pipes[1]);
+            }
+
+            api::execve(file, argv, envp);
+            exit(1);
+        }
+        // Parent
+        else {
+            var process = Process { id: pid as u64 };
+
+            if (info.stdin == Stdio::Pipe) {
+                process.stdin = Fd { handle: stdin_pipes[1] };
+                api::fcntl(stdin_pipes[1], /* F_SETFD */ 2, /* FD_CLOEXEC */ 1);
+                api::close(stdin_pipes[0]);
+            }
+            else {
+                process.stdin = Fd::invalid();
+            }
+
+            if (info.stdout == Stdio::Pipe) {
+                process.stdout = Fd { handle: stdout_pipes[0] };
+                api::fcntl(stdout_pipes[0], /* F_SETFD */ 2, /* FD_CLOEXEC */ 1);
+                api::close(stdout_pipes[1]);
+            }
+            else {
+                process.stdout = Fd::invalid();
+            }
+
+            if (info.stderr == Stdio::Pipe) {
+                process.stderr = Fd { handle: stderr_pipes[0] };
+                api::fcntl(stderr_pipes[0], /* F_SETFD */ 2, /* FD_CLOEXEC */ 1);
+                api::close(stderr_pipes[1]);
+            }
+            else {
+                process.stderr = Fd::invalid();
+            }
+
+            result = process;
+        }
+    } else {
+        if (info.stdin == Stdio::Pipe) {
+            api::close(stdin_pipes[0]);
+            api::close(stdin_pipes[1]);
+        }
+
+        if (info.stdout == Stdio::Pipe) {
+            api::close(stdout_pipes[0]);
+            api::close(stdout_pipes[1]);
+        }
+
+        if (info.stderr == Stdio::Pipe) {
+            api::close(stderr_pipes[0]);
+            api::close(stderr_pipes[1]);
+        }
+    }
+
+    // Free envp
+    if (info.env.size() > 0) {
+        for (var i = 0u; i < info.env.size(); i++) {
+            free(envp[i]);
+        }
+
+        free(envp);
+    }
+
+    // Free cwd
+    if (cwd != null) {
+        free(cwd);
+    }
+
+    // Free argv
+    for (var i = 0u; i < info.args.size(); i++) {
+        free(argv[1 + i]);
+    }
+
+    free(argv);
+
+    // Free file
+    free(file);
+
+    // Return result
+    return result;
+}
+
+pub func wait(pid: u64) ?ExitStatus {
+    var status: i32;
+
+    var result = api::waitpid(pid as i32, &status, 0);
+    if (result == -1) return Option:[ExitStatus]::none();
+
+    return ExitStatus { raw: *(&status as *u32) };
+}

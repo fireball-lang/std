@@ -1,0 +1,136 @@
+#[cfg(target_family = "unix")]
+
+mod std::os::unix;
+
+import std::c::{to_cstring, from_cstring, malloc, free, memcpy};
+import std::os::{FileKind, FileInfo};
+import std::os::unix::{stat};
+import std::os::unix::api;
+
+pub func create_dir(path: StringView) ?bool {
+    var c_path = to_cstring(path);
+    var result = api::mkdir(c_path, 511);
+    free(c_path);
+
+    if (result == -1) return Option:[bool]::none();
+    return true;
+}
+
+pub func delete_dir(path: StringView) ?bool {
+    var c_path = to_cstring(path);
+    var result = api::rmdir(c_path);
+    free(c_path);
+
+    if (result == -1) return Option:[bool]::none();
+    return true;
+}
+
+// Listing
+
+pub struct DirEntryInfo {
+    empty: bool,
+    info: FileInfo,
+}
+
+impl DirEntryInfo {
+    pub func get(mut self, iter: &DirIterator, name: StringView) ?FileInfo {
+        if (self.empty) {
+            self.info = iter.stat(name)?;
+            self.empty = false;
+        }
+
+        return self.info;
+    }
+}
+
+pub struct DirIterator {
+    path: StringView,
+    dir: *void,
+}
+
+pub func list_dir(path: StringView) ?DirIterator {
+    var c_path = to_cstring(path);
+    var dir = api::opendir(c_path);
+
+    if (dir == null) {
+        free(c_path);
+        return Option:[DirIterator]::none();
+    }
+
+    return DirIterator {
+        path: StringView { ptr: c_path, size: path.size },
+        dir: dir,
+    };
+}
+
+impl DirIterator {
+    pub func next(mut self, kind: mut &FileKind, info: mut &DirEntryInfo) StringView {
+        if (self.dir == null) return "";
+
+        for (;;) {
+            var dirent = api::readdir(self.dir);
+
+            // EOF
+            if (dirent == null) {
+                free(self.path.ptr);
+                api::closedir(self.dir);
+
+                self.dir = null;
+                return "";
+            }
+
+            // Skip over '.' and '..'
+            var name = from_cstring(&dirent.name[0]);
+            if (name == "." || name == "..") continue;
+
+            // Get FileKind with fallback to `stat()`
+            info.empty = true;
+
+            if (dirent.type_ == 0) {
+                var info_opt = self.stat(name);
+
+                if (info_opt.is_some()) {
+                    info.empty = false;
+                    info.info = info_opt.unwrap();
+
+                    *kind = info.info.kind;
+                }
+            }
+            else if (dirent.type_ == 8) {
+                *kind = FileKind::File;
+            }
+            else if (dirent.type_ == 4) {
+                *kind = FileKind::Directory;
+            }
+            else if (dirent.type_ == 10) {
+                *kind = FileKind::Symlink;
+            }
+            else {
+                *kind = FileKind::Other;
+            }
+
+            // Return
+            return name;
+        }
+
+        // unreachable
+        return "";
+    }
+
+    func stat(self, name: StringView) ?FileInfo {
+        var slash = 0u;
+        if (!self.path.ends_with("/")) slash = 1;
+
+        var path = malloc(self.path.size + slash + name.size + 1) as mut *u8;
+
+        memcpy(&path[0], self.path.ptr, self.path.size);
+        if (slash != 0) path[self.path.size] = '/';
+        memcpy(&path[self.path.size + slash], name.ptr, name.size);
+        path[self.path.size + slash + name.size] = 0;
+
+        var result = stat(path);
+        free(path);
+
+        return result;
+    }
+}

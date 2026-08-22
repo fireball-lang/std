@@ -2,124 +2,114 @@
 
 mod std::os::windows;
 
+import std::os::{Seek, FileKind, FileInfo};
 import std::c::{to_cstring, free};
-import std::os::{Seek};
-
-// Bindings
-
-enum Access : u32 {
-    Read = 0x80000000,
-    Write = 0x40000000,
-}
-
-enum Share : u32 {
-    Exclusive = 0,
-    Read = 1,
-}
-
-enum Disposition : u32 {
-    CreateAlways = 2,
-    OpenExisting = 3,
-}
-
-enum Flags : u32 {
-    Normal = 128,
-}
-
-#[extern]
-func CreateFileA(name: *u8, access: Access, share: Share, security: *void, disposition: Disposition, flags: Flags, template: *void) *void;
-
-#[extern]
-func ReadFile(handle: *void, buffer: mut* void, bytes_to_read: u32, bytes_read: mut* u32, overlapped: *void) i32;
-
-#[extern]
-func WriteFile(handle: *void, data: *void, bytes_to_write: u32, bytes_written: mut* u32, overlapped: *void) i32;
-
-#[extern]
-func SetFilePointerEx(handle: *void, distance: i64, new_position: mut* i64, method: u32) i32;
-
-#[extern]
-func CloseHandle(handle: *void) i32;
-
-#[extern]
-func GetStdHandle(std_handle: u32) *void;
-
-func invalid_handle() *void {
-    return (-1 as u64) as *void;
-}
-
-// Fd
+import std::io::{Reader, Writer};
+import std::os::windows::api;
 
 pub struct Fd {
-    handle: *void,
+    handle: api::Handle,
 }
 
 impl Fd {
     pub func create(path: StringView) ?Fd {
         var path_c = to_cstring(path);
-        var handle = CreateFileA(path_c, Access::Write, Share::Exclusive, null, Disposition::CreateAlways, Flags::Normal, null);
+        var handle = api::CreateFileA(path_c, api::Access::Write, api::Share::Exclusive, null, api::Disposition::CreateAlways, api::Flags::Normal, null);
         free(path_c);
 
-        if (handle == invalid_handle()) return Option:[Fd]::none();
+        if (!handle.valid()) return Option:[Fd]::none();
         return Fd { handle: handle };
     }
 
     pub func open(path: StringView) ?Fd {
         var path_c = to_cstring(path);
-        var handle = CreateFileA(path_c, Access::Read, Share::Read, null, Disposition::OpenExisting, Flags::Normal, null);
+        var handle = api::CreateFileA(path_c, api::Access::Read, api::Share::Read, null, api::Disposition::OpenExisting, api::Flags::Normal, null);
         free(path_c);
 
-        if (handle == invalid_handle()) return Option:[Fd]::none();
+        if (!handle.valid()) return Option:[Fd]::none();
         return Fd { handle: handle };
     }
 
     pub func stdin() Fd {
-        return Fd { handle: GetStdHandle(-10 as u32) };
+        return Fd { handle: api::GetStdHandle(-10 as u32) };
     }
 
     pub func stdout() Fd {
-        return Fd { handle: GetStdHandle(-11 as u32) };
+        return Fd { handle: api::GetStdHandle(-11 as u32) };
     }
 
     pub func stderr() Fd {
-        return Fd { handle: GetStdHandle(-12 as u32) };
+        return Fd { handle: api::GetStdHandle(-12 as u32) };
+    }
+
+    pub func invalid() Fd {
+        return Fd { handle: api::Handle::invalid() };
     }
 
     pub func close(mut self) {
-        CloseHandle(self.handle);
+        if (!self.handle.valid()) return;
+
+        api::CloseHandle(&self.handle);
     }
 
     pub func seek(mut self, mode: Seek, offset: i64) ?u64 {
         var new_pos: i64 = 0;
 
-        if (SetFilePointerEx(self.handle, offset, &new_pos, mode as u32) == 0) {
+        if (api::SetFilePointerEx(self.handle, offset, &new_pos, mode as u32) == 0) {
             return Option:[u64]::none();
         }
 
         return new_pos as u64;
     }
+}
 
+impl Fd : Reader {
     pub func read(mut self, buffer: mut []u8) ?u64 {
         if (buffer.size > 4_294_967_295u) buffer = buffer.slice(0u, 4_294_967_295u);
 
         var bytes_read: u32 = 0u;
 
-        if (ReadFile(self.handle, buffer.ptr, buffer.size as u32, &bytes_read, null) == 0) {
+        if (api::ReadFile(self.handle, buffer.ptr, buffer.size as u32, &bytes_read, null) == 0) {
             return Option:[u64]::none();
         }
 
         return bytes_read as u64;
     }
+}
 
+impl Fd : Writer {
     pub func write(mut self, data: []u8) ?u64 {
         if (data.size > 4_294_967_295u) data = data.slice(0u, 4_294_967_295u);
 
         var bytes_written: u32 = 0u;
 
-        if (WriteFile(self.handle, data.ptr, data.size as u32, &bytes_written, null) == 0) {
+        if (api::WriteFile(self.handle, data.ptr, data.size as u32, &bytes_written, null) == 0) {
             return Option:[u64]::none();
         }
 
         return bytes_written as u64;
     }
+}
+
+pub func stat(path: *u8) ?FileInfo {
+    // Call native API
+    var data: api::FileAttributeData;
+    var result = api::GetFileAttributesExA(path, 0, &data);
+
+    if (result == 0) return Option:[FileInfo]::none();
+
+    // Create FileInfo
+    return get_file_info(data);
+}
+
+pub func get_file_info(data: api::FileAttributeData) FileInfo {
+    var kind = FileKind::File;
+
+    if ((data.file_attributes & 0x00000010) != 0) kind = FileKind::Directory;
+    else if ((data.file_attributes & 0x00000400) != 0) kind = FileKind::Symlink;
+
+    return FileInfo {
+        kind: kind,
+        size: (data.file_size_high as u64 << 32) | (data.file_size_low as u64),
+    };
 }

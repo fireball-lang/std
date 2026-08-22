@@ -1,0 +1,214 @@
+mod std::os;
+
+import std::os::{File, FileInfo, get_cwd, write_cwd, get_env};
+import std::{ArrayList, String};
+
+/// Finds an absolute executable path of a provided string `program`.
+/// - If the provided string is already an absolute path, then it is return as is.
+/// - If the provided string contains any path separatators then it is interpreted as a relative path and resolved against the current working directory.
+/// - Otherwise, the program name is looked up inside %PATH%.
+pub func lookup_path(program: StringView) ?String {
+    // Absolute
+    if (is_abs(program)) {
+        var path = String::new(program);
+        if (resolve_executable(program, &path)) return path;
+
+        path.free();
+        return Option:[String]::none();
+    }
+
+    // Relative
+    if (program.contains("/") || program.contains("\\")) {
+        // Construct path
+        var path = get_cwd()?;
+
+        if (!path.ends_with("/") && !path.ends_with("\\")) path.write("/");
+
+        if (program.starts_with("./") || program.starts_with(".\\")) {
+            path.write(program.slice(2, program.size));
+        }
+        else {
+            path.write(program);
+        }
+
+        // Check files
+        if (resolve_executable(program, &path)) return path;
+
+        path.free();
+        return Option:[String]::none();
+    }
+
+    // Program
+    var path_env = get_env("PATH") or "";
+    var path = String::with_capacity(64);
+
+    while (path_env != "") {
+        // Get current path env entry and advance
+        var i = path_env.index_of(path_env_separator());
+
+        if (i == -1) {
+            path.set(path_env);
+            path_env = "";
+        }
+        else {
+            path.set(path_env.slice(0, i as u32));
+            path_env = path_env.slice(i as u32 + 1, path_env.size);
+        }
+
+        // Check if current is empty
+        if (path == "") {
+            if (empty_means_cwd()) {
+                if (write_cwd(&path).is_none()) {
+                    continue;
+                }
+            }
+            else {
+                continue;
+            }
+        }
+
+        // Construct path
+        if (!path.ends_with("/") && !path.ends_with("\\")) path.write("/");
+        path.write(program);
+
+        // Check for file in the current entry
+        if (resolve_executable(program, &path)) return path;
+    }
+
+    path.free();
+    return Option:[String]::none();
+}
+
+func resolve_executable(program: StringView, path: mut &String) bool {
+    var start_path_size = path.size();
+
+    // Check if path already ends with an executable extension
+    for (var i = 0u; i < (executable_extensions as []String).size; i++) {
+        if (program.ends_with(executable_extensions[i])) {
+            return test_executable_file(path);
+        }
+    }
+
+    // Otheriwse test all executable extensions
+    for (var i = 0u; i < (executable_extensions as []String).size; i++) {
+        // Construct path with extension
+        path.truncate(start_path_size);
+        path.write(executable_extensions[i].as_bytes());
+
+        // Test file
+        if (test_executable_file(path)) return true;
+    }
+
+    return false;
+}
+
+func test_executable_file(path: mut &String) bool {
+    var info_opt = File::info(path);
+    if (info_opt.is_none()) return false;
+
+    if (!info_opt.unwrap().is_file()) return false;
+    if (!can_execute(path)) return false;
+
+    return true;
+}
+
+// Is absolute
+
+#[cfg(target_family = "windows")]
+func is_abs(path: StringView) bool {
+    if (path.starts_with("/") || path.starts_with("\\")) return true;
+    if (path.size < 3) return false;
+
+    var first = path[0];
+    return ((first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z')) && path[1] == ':' && (path[2] == '/' || path[2] == '\\');
+}
+
+#[cfg(target_family = "unix")]
+func is_abs(path: StringView) bool {
+    return path.starts_with("/");
+}
+
+// %PATH% separator
+
+#[cfg(target_family = "windows")]
+func path_env_separator() StringView {
+    return ";";
+}
+
+#[cfg(target_family = "unix")]
+func path_env_separator() StringView {
+    return ":";
+}
+
+// Empty means CWD
+
+#[cfg(target_family = "windows")]
+func empty_means_cwd() bool {
+    return false;
+}
+
+#[cfg(target_family = "unix")]
+func empty_means_cwd() bool {
+    return true;
+}
+
+// Executable file extensions
+
+var executable_extensions: ArrayList[String];
+
+#[init, cfg(target_family = "windows")]
+func init_executable_extensions() {
+    var pathext = get_env("PATHEXT") or "";
+
+    // Hardcoded extensions
+    if (pathext == "") {
+        executable_extensions.add(String::new(".exe"));
+        executable_extensions.add(String::new(".bat"));
+
+        return;
+    }
+
+    // Extensions from %PATHEXT%
+    while (pathext != "") {
+        var current = "";
+        var i = pathext.index_of(";");
+
+        if (i == -1) {
+            current = pathext;
+            pathext = "";
+        }
+        else {
+            current = pathext.slice(0, i as u32);
+            pathext = pathext.slice(i as u32 + 1, pathext.size);
+        }
+
+        current = current.trim();
+        if (current == "") continue;
+
+        executable_extensions.add(String::new(current));
+    }
+}
+
+#[init, cfg(target_family = "unix")]
+func init_executable_extensions() {
+    executable_extensions.add(String::new(""));
+}
+
+// Executable
+
+#[cfg(target_family = "windows")]
+func can_execute(_path: mut &String) bool {
+    return true;
+}
+
+#[extern, cfg(target_family = "unix")]
+func access(path: *u8, mode: i32) i32;
+
+#[cfg(target_family = "unix")]
+func can_execute(path: mut &String) bool {
+    path.write("\x00");
+    var result = access(path.as_bytes().ptr, 1) == 0;
+    path.remove(path.size() - 1);
+
+    return result;
+}

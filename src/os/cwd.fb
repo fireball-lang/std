@@ -1,0 +1,24 @@
+mod std::os;
+
+import std::io::{Writer};
+import std::{String};
+
+#[cfg(target_family = "windows")]
+import std::os::windows as imp;
+#[cfg(target_family = "unix")]
+import std::os::unix as imp;
+
+pub func write_cwd(writer: mut Writer) ?u64 {
+    var buffer: [1024]u8;
+    var written = imp::get_cwd(buffer)?;
+
+    writer.write((buffer as []u8).slice(0, written));
+    return written;
+}
+
+pub func get_cwd() ?String {
+    var str = String::with_capacity(64);
+    write_cwd(&str)?;
+
+    return str;
+}

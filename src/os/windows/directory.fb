@@ -1,0 +1,104 @@
+#[cfg(target_family = "windows")]
+
+mod std::os::windows;
+
+import std::os::windows::{get_file_info};
+import std::c::{to_cstring, from_cstring, malloc, free, memcpy};
+import std::os::{FileKind, FileInfo};
+import std::os::windows::api;
+
+pub func create_dir(path: StringView) ?bool {
+    var c_path = to_cstring(path);
+    var result = api::CreateDirectoryA(c_path, null);
+    free(c_path);
+
+    if (result == 0) return Option:[bool]::none();
+    return true;
+}
+
+pub func delete_dir(path: StringView) ?bool {
+    var c_path = to_cstring(path);
+    var result = api::RemoveDirectoryA(c_path);
+    free(c_path);
+
+    if (result == 0) return Option:[bool]::none();
+    return true;
+}
+
+// Listing
+
+pub struct DirEntryInfo {
+    kind: FileKind,
+    info: FileInfo,
+}
+
+impl DirEntryInfo {
+    pub func get(mut self, _iter: &DirIterator, _name: StringView) ?FileInfo {
+        return self.info;
+    }
+}
+
+pub struct DirIterator {
+    handle: api::Handle,
+    data: api::FindData,
+    first: bool,
+}
+
+pub func list_dir(path: StringView) ?DirIterator {
+    // Create path
+    var slash = 0u;
+    if (!path.ends_with("/") && !path.ends_with("\\")) slash = 1;
+
+    var c_path = malloc(path.size + slash + 1 + 1) as mut *u8;
+
+    memcpy(&c_path[0], path.ptr, path.size);
+    if (slash != 0) c_path[path.size] = '\\';
+    c_path[path.size + slash] = '*';
+    c_path[path.size + slash + 1] = 0;
+
+    // Call native API
+    var data: api::FindData;
+
+    var handle = api::FindFirstFileA(c_path, &data);
+    free(c_path);
+
+    if (!handle.valid()) return Option:[DirIterator]::none();
+
+    // Return iterator
+    return DirIterator {
+        handle: handle,
+        data: data,
+        first: true,
+    };
+}
+
+impl DirIterator {
+    pub func next(mut self, kind: mut &FileKind, info: mut &DirEntryInfo) StringView {
+        if (!self.handle.valid()) return "";
+
+        for (;;) {
+            // Get entry
+            if (!self.first) {
+                if (api::FindNextFileA(self.handle, &self.data) == 0) {
+                    api::FindClose(&self.handle);
+                    return "";
+                }
+            }
+
+            self.first = false;
+
+            // Skip over '.' and '..'
+            var name = from_cstring(&self.data.file_name[0]);
+            if (name == "." || name == "..") continue;
+
+            // Return
+            info.info = get_file_info(self.data.file_data);
+            *kind = info.info.kind;
+
+            return name;
+        }
+
+        // unreachable
+        return "";
+    }
+}

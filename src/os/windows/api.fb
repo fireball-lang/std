@@ -1,0 +1,269 @@
+#[cfg(target_family = "windows")]
+
+mod std::os::windows::api;
+
+// Enums
+
+pub enum Access : u32 {
+    All = 0x10000000,
+    Execute = 0x20000000,
+    Write = 0x40000000,
+    Read = 0x80000000,
+}
+
+impl Access : BitOr[Access] {
+    type Result = Access;
+
+    pub func bit_or(self, rhs: Self) Self {
+        return ((*self as u32) | (rhs as u32)) as Self;
+    }
+}
+
+pub enum Share : u32 {
+    Exclusive = 0,
+    Read = 1,
+    Write = 2,
+    Delete = 4,
+}
+
+impl Share : BitOr[Share] {
+    type Result = Share;
+
+    pub func bit_or(self, rhs: Self) Self {
+        return ((*self as u32) | (rhs as u32)) as Self;
+    }
+}
+
+pub enum Disposition : u32 {
+    CreateNew = 1,
+    CreateAlways = 2,
+    OpenExisting = 3,
+    OpenAlways = 4,
+    TruncateExisting = 5,
+}
+
+pub enum Flags : u32 {
+    // Attributes
+    ReadOnly = 1,
+    Hidden = 2,
+    System = 4,
+    Archive = 32,
+    Normal = 128,
+    Temporary = 256,
+    Offline = 4096,
+    Encrypted = 16384,
+
+    // Flags
+    BackupSemantics = 0x02000000,
+    DeleteOnClose = 0x04000000,
+    NoBuffering = 0x20000000,
+    OpenNoRecall = 0x00100000,
+    OpenReparsePoint = 0x00200000,
+    Overlapped = 0x40000000,
+    PosixSemantics = 0x01000000,
+    RandomAccess = 0x10000000,
+    SessionAware = 0x00800000,
+    SequentialScan = 0x08000000,
+    WriteThrough = 0x80000000,
+}
+
+impl Flags : BitOr[Flags] {
+    type Result = Flags;
+
+    pub func bit_or(self, rhs: Self) Self {
+        return ((*self as u32) | (rhs as u32)) as Self;
+    }
+}
+
+pub enum HandleFlags : u32 {
+    Inherit = 1,
+    ProtectFromClose = 2,
+}
+
+impl HandleFlags : BitOr[HandleFlags] {
+    type Result = HandleFlags;
+
+    pub func bit_or(self, rhs: Self) Self {
+        return ((*self as u32) | (rhs as u32)) as Self;
+    }
+}
+
+// Structs
+
+#[repr(C)]
+pub struct FileTime {
+    pub low: u32,
+    pub high: u32,
+}
+
+#[repr(C)]
+pub struct FileAttributeData {
+    pub file_attributes: u32,
+    pub creation_time: FileTime,
+    pub last_access_time: FileTime,
+    pub last_write_time: FileTime,
+    pub file_size_high: u32,
+    pub file_size_low: u32,
+}
+
+#[repr(C)]
+pub struct FindData {
+    pub file_data: FileAttributeData,
+    pub reserved0: u32,
+    pub reserved1: u32,
+    pub file_name: [260]u8,
+    pub alternate_file_name: [14]u8,
+
+    /// Obsolete
+    file_type: u32,
+    /// Obsolete
+    creator_type: u32,
+    /// Obsolete
+    finder_flags: u16,
+}
+
+#[repr(C)]
+pub struct SecurityAttributes {
+    pub length: u32,
+    pub security_descriptor: *void,
+    pub inherit_handle: i32,
+}
+
+#[repr(C)]
+pub struct StartupInfo {
+    pub cb: u32,
+    pub reserved: *u8,
+    pub desktop: *u8,
+    pub title: *u8,
+    pub x: u32,
+    pub y: u32,
+    pub x_size: u32,
+    pub y_size: u32,
+    pub x_count_chars: u32,
+    pub y_count_chars: u32,
+    pub fill_attribute: u32,
+    pub flags: u32,
+    pub show_window: u16,
+    pub reserved2: u16,
+    pub reserved3: *void,
+    pub std_input: Handle,
+    pub std_output: Handle,
+    pub std_error: Handle,
+}
+
+#[repr(C)]
+pub struct ProcessInformation {
+    pub process: Handle,
+    pub thread: Handle,
+    pub process_id: u32,
+    pub thread_id: u32,
+}
+
+#[repr(C)]
+pub struct Handle {
+    pub raw: *void,
+}
+
+impl Handle {
+    pub func invalid() Self {
+        return Self { raw: (0xFFFFFFFFFFFFFFFF as u64) as *void };
+    }
+
+    pub func valid(self) bool {
+        return self.raw as u64 != 0xFFFFFFFFFFFFFFFF;
+    }
+}
+
+// Functions
+
+#[extern]
+pub func CreateDirectoryA(path: *u8, security: *SecurityAttributes) i32;
+
+#[extern]
+pub func RemoveDirectoryA(path: *u8) i32;
+
+#[extern]
+pub func FindFirstFileA(file_name: *u8, data: mut *FindData) Handle;
+
+#[extern]
+pub func FindNextFileA(find_file: Handle, data: mut *FindData) i32;
+
+#[extern, link_name("FindClose")]
+pub func FindClose_(find_file: Handle) i32;
+
+pub func FindClose(handle: mut &Handle) i32 {
+    if (!handle.valid()) return 1;
+
+    var result = FindClose_(*handle);
+    *handle = Handle::invalid();
+
+    return result;
+}
+
+#[extern]
+pub func GetCurrentDirectoryA(length: u32, buffer: mut *u8) u32;
+
+#[extern]
+pub func CreateFileA(name: *u8, access: Access, share: Share, security: *SecurityAttributes, disposition: Disposition, flags: Flags, template: *void) Handle;
+
+#[extern]
+pub func ReadFile(handle: Handle, buffer: mut* void, bytes_to_read: u32, bytes_read: mut* u32, overlapped: *void) i32;
+
+#[extern]
+pub func WriteFile(handle: Handle, data: *void, bytes_to_write: u32, bytes_written: mut* u32, overlapped: *void) i32;
+
+#[extern]
+pub func SetFilePointerEx(handle: Handle, distance: i64, new_position: mut* i64, method: u32) i32;
+
+#[extern, link_name("CloseHandle")]
+func CloseHandle_(handle: Handle) i32;
+
+pub func CloseHandle(handle: mut &Handle) i32 {
+    if (!handle.valid()) return 1;
+
+    var result = CloseHandle_(*handle);
+    *handle = Handle::invalid();
+
+    return result;
+}
+
+#[extern]
+pub func GetFileAttributesExA(file_name: *u8, info_level: i32, file_information: mut *void) i32;
+
+#[extern]
+pub func GetStdHandle(std_handle: u32) Handle;
+
+#[extern]
+pub func LoadLibraryA(name: *u8) *void;
+
+#[extern]
+pub func GetProcAddress(module: *void, name: *u8) *void;
+
+#[extern]
+pub func FreeLibrary(module: *void) i32;
+
+#[extern]
+pub func CreatePipe(read_pipe: mut *Handle, write_pipe: mut *Handle, security: *SecurityAttributes, size: u32) i32;
+
+#[extern]
+pub func SetHandleInformation(handle: Handle, mask: HandleFlags, flags: HandleFlags) i32;
+
+#[extern]
+pub func CreateProcessA(
+    application_name: *u8,
+    command_line: *u8,
+    process_attributes: *SecurityAttributes,
+    thread_attributes: *SecurityAttributes,
+    inherit_handles: i32,
+    creation_flags: u32,
+    envrionment: *u8,
+    current_directory: *u8,
+    startup_info: *StartupInfo,
+    process_informaton: mut *ProcessInformation,
+) i32;
+
+#[extern]
+pub func WaitForSingleObject(handle: Handle, ms: u32) u32;
+
+#[extern]
+pub func GetExitCodeProcess(process: Handle, exit_code: mut *u32) i32;

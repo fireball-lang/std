@@ -2,63 +2,10 @@
 
 mod std::os::unix;
 
+import std::os::{Seek, FileKind, FileInfo};
 import std::c::{to_cstring, free};
-import std::os::{Seek};
-
-// Bindings
-
-#[cfg(target_os = "linux")]
-enum FileFlags : i32 {
-    ReadOnly = 0,
-    WriteOnly = 1,
-    Create = 64,
-    Truncate = 512,
-    CloseOnExec = 524288,
-}
-
-#[cfg(target_os = "macos")]
-enum FileFlags : i32 {
-    ReadOnly = 0,
-    WriteOnly = 1,
-    Create = 512,
-    Truncate = 1024,
-    CloseOnExec = 16777216,
-}
-
-impl FileFlags : BitOr[FileFlags] {
-    type Result = FileFlags;
-
-    pub func bit_or(self, rhs: Self) Self {
-        return (*self as i32 | rhs as i32) as Self;
-    }
-}
-
-#[cfg(target_os = "linux")]
-func at_fdcwd() i32 {
-    return -100;
-}
-
-#[cfg(target_os = "macos")]
-func at_fdcwd() i32 {
-    return -2;
-}
-
-#[extern]
-func openat(fd: i32, path: *u8, flags: FileFlags, mode: i32) i32;
-
-#[extern]
-func close(fd: i32) i32;
-
-#[extern]
-func lseek(fd: i32, offset: i64, whence: i32) i64;
-
-#[extern]
-func read(fd: i32, buffer: mut* void, size: u64) i64;
-
-#[extern]
-func write(fd: i32, data: *void, size: u64) i64;
-
-// Fd
+import std::io::{Reader, Writer};
+import std::os::unix::api;
 
 pub struct Fd {
     handle: i32,
@@ -67,7 +14,7 @@ pub struct Fd {
 impl Fd {
     pub func create(path: StringView) ?Fd {
         var path_c = to_cstring(path);
-        var handle = openat(at_fdcwd(), path_c, FileFlags::Create | FileFlags::Truncate | FileFlags::WriteOnly | FileFlags::CloseOnExec, 438);
+        var handle = api::openat(api::at_fdcwd(), path_c, api::FileFlags::Create | api::FileFlags::Truncate | api::FileFlags::WriteOnly | api::FileFlags::CloseOnExec, 438);
         free(path_c);
 
         if (handle < 0) return Option:[Fd]::none();
@@ -76,7 +23,7 @@ impl Fd {
 
     pub func open(path: StringView) ?Fd {
         var path_c = to_cstring(path);
-        var handle = openat(at_fdcwd(), path_c, FileFlags::ReadOnly | FileFlags::CloseOnExec, 0);
+        var handle = api::openat(api::at_fdcwd(), path_c, api::FileFlags::ReadOnly | api::FileFlags::CloseOnExec, 0);
         free(path_c);
 
         if (handle < 0) return Option:[Fd]::none();
@@ -95,28 +42,60 @@ impl Fd {
         return Fd { handle: 2 };
     }
 
+    pub func invalid() Fd {
+        return Fd { handle: -1 };
+    }
+
     pub func close(mut self) {
-        close(self.handle);
+        if (self.handle == -1) return;
+
+        api::close(self.handle);
+        self.handle = -1;
     }
 
     pub func seek(mut self, mode: Seek, offset: i64) ?u64 {
-        var position = lseek(self.handle, offset, mode as i32);
+        var position = api::lseek(self.handle, offset, mode as i32);
         if (position < 0) return Option:[u64]::none();
 
         return position as u64;
     }
+}
 
+impl Fd : Reader {
     pub func read(mut self, buffer: mut []u8) ?u64 {
-        var read = read(self.handle, buffer.ptr, buffer.size);
+        var read = api::read(self.handle, buffer.ptr, buffer.size);
         if (read < 0) return Option:[u64]::none();
 
         return read as u64;
     }
+}
 
+impl Fd : Writer {
     pub func write(mut self, data: []u8) ?u64 {
-        var written = write(self.handle, data.ptr, data.size);
+        var written = api::write(self.handle, data.ptr, data.size);
         if (written < 0) return Option:[u64]::none();
 
         return written as u64;
     }
+}
+
+pub func stat(path: *u8) ?FileInfo {
+    // Call native API
+    var stat: api::Stat;
+    var result = api::fstatat(api::at_fdcwd(), path, &stat, 0);
+
+    if (result == -1) return Option:[FileInfo]::none();
+
+    // Create FileInfo
+    var mode = stat.mode & 0x0000F000;
+    var kind = FileKind::Other;
+
+    if (mode == 0x00008000) kind = FileKind::File;
+    else if (mode == 0x00004000) kind = FileKind::Directory;
+    else if (mode == 0x0000A000) kind = FileKind::Symlink;
+
+    return FileInfo {
+        kind: kind,
+        size: stat.size,
+    };
 }

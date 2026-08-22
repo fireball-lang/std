@@ -1,0 +1,11 @@
+#[cfg(target_family = "unix")]
+
+mod std::os::unix;
+
+import std::c::{from_cstring};
+import std::os::unix::api;
+
+pub func get_cwd(buffer: mut []u8) ?u64 {
+    if (api::getcwd(buffer.ptr, buffer.size) == null) return Option:[u64]::none();
+    return from_cstring(buffer.ptr).size;
+}

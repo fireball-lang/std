@@ -26,3 +26,13 @@ pub func to_cstring(str: StringView) mut* u8 {
 
     return cstr;
 }
+
+pub func from_cstring(str: *u8) StringView {
+    var size = 0u;
+
+    while (str[size] != 0) {
+        size++;
+    }
+
+    return StringView { ptr: str, size: size };
+}

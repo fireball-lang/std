@@ -43,12 +43,21 @@ impl String {
         self.bytes.ensure_capacity(additional_size);
     }
 
+    pub func truncate(mut self, size: u64) {
+        self.bytes.truncate(size);
+    }
+
     pub func remove(mut self, index: u64) u8 {
         return self.bytes.remove(index);
     }
 
     pub func clear(mut self) {
         self.bytes.clear();
+    }
+
+    pub func set(mut self, str: StringView) {
+        self.clear();
+        self.write(str);
     }
 
     pub func free(mut self) {

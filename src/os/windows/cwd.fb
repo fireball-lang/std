@@ -1,0 +1,12 @@
+#[cfg(target_family = "windows")]
+
+mod std::os::windows;
+
+import std::os::windows::api;
+
+pub func get_cwd(buffer: mut []u8) ?u64 {
+    var result = api::GetCurrentDirectoryA(buffer.size as u32, buffer.ptr);
+    if (result >= buffer.size) return Option:[u64]::none();
+
+    return result;
+}

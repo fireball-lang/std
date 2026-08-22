@@ -1,0 +1,225 @@
+#[cfg(target_family = "windows")]
+
+mod std::os::windows;
+
+import std::os::{Stdio, ProcessInfo, Process, ExitStatus};
+import std::c::{to_cstring, malloc, free, memcpy};
+import std::os::windows::{Fd};
+import std::os::windows::api;
+import std::{String};
+
+pub func spawn(info: ProcessInfo) ?Process {
+    // Allocate application name
+    var app_name = to_cstring(info.program);
+
+    // Allocate command line
+    var cmd_line = String::with_capacity(64);
+
+    write_arg(&cmd_line, info.program);
+
+    for (var i = 0u; i < info.args.size(); i++) {
+        var arg = info.args[i];
+        write_arg(&cmd_line, arg);
+    }
+
+    cmd_line.write("\x00");
+
+    // Allocate envrionment
+    var environment: String;
+    var env_ptr: *u8;
+
+    if (info.env.size() > 0) {
+        environment = String::with_capacity(256);
+
+        for (var i = 0u; i < info.env.size(); i++) {
+            var item = info.env.get_at(i);
+
+            environment.write(item.key);
+            environment.write("=");
+            environment.write(item.value);
+            environment.write("\x00");
+        }
+
+        environment.write("\x00");
+        env_ptr = environment.as_bytes().ptr;
+    }
+
+    // Allocate cwd
+    var cwd: *u8;
+
+    if (info.cwd != "") {
+        cwd = to_cstring(info.cwd);
+    }
+
+    // Create startup info
+    var start_info = api::StartupInfo {
+        cb: sizeof(api::StartupInfo),
+        flags: 0x00000100, // STARTF_USESTDHANDLES
+    };
+
+    var inherit_security = api::SecurityAttributes {
+        length: sizeof(api::SecurityAttributes),
+        inherit_handle: 1,
+    };
+
+    var stdin_read_pipe = api::Handle::invalid();
+    var stdin_write_pipe = api::Handle::invalid();
+
+    if (info.stdin == Stdio::Null) {
+        start_info.std_input = api::CreateFileA("NUL".ptr, api::Access::Read, api::Share::Read, &inherit_security, api::Disposition::OpenExisting, api::Flags::Normal, null);
+    }
+    else if (info.stdin == Stdio::Pipe) {
+        api::CreatePipe(&stdin_read_pipe, &stdin_write_pipe, &inherit_security, 0);
+
+        start_info.std_input = stdin_read_pipe;
+        api::SetHandleInformation(stdin_write_pipe, api::HandleFlags::Inherit, 0 as api::HandleFlags);
+    }
+    else {
+        start_info.std_input = Fd::stdin().handle;
+    }
+
+    var stdout_read_pipe = api::Handle::invalid();
+    var stdout_write_pipe = api::Handle::invalid();
+
+    if (info.stdout == Stdio::Null) {
+        start_info.std_output = api::CreateFileA("NUL".ptr, api::Access::Write, api::Share::Read | api::Share::Write, &inherit_security, api::Disposition::OpenExisting, api::Flags::Normal, null);
+    }
+    else if (info.stdout == Stdio::Pipe) {
+        api::CreatePipe(&stdout_read_pipe, &stdout_write_pipe, &inherit_security, 0);
+
+        start_info.std_output = stdout_write_pipe;
+        api::SetHandleInformation(stdout_read_pipe, api::HandleFlags::Inherit, 0 as api::HandleFlags);
+    }
+    else {
+        start_info.std_output = Fd::stdout().handle;
+    }
+
+    var stderr_read_pipe = api::Handle::invalid();
+    var stderr_write_pipe = api::Handle::invalid();
+
+    if (info.stderr == Stdio::Null) {
+        start_info.std_error = api::CreateFileA("NUL".ptr, api::Access::Write, api::Share::Read | api::Share::Write, &inherit_security, api::Disposition::OpenExisting, api::Flags::Normal, null);
+    }
+    else if (info.stderr == Stdio::Pipe) {
+        api::CreatePipe(&stderr_read_pipe, &stderr_write_pipe, &inherit_security, 0);
+
+        start_info.std_error = stderr_write_pipe;
+        api::SetHandleInformation(stderr_read_pipe, api::HandleFlags::Inherit, 0 as api::HandleFlags);
+    }
+    else {
+        start_info.std_error = Fd::stderr().handle;
+    }
+
+    // Create process
+    var result: ?Process;
+    var proc_info: api::ProcessInformation;
+
+    if (api::CreateProcessA(app_name, cmd_line.as_bytes().ptr, null, null, 1, 0, env_ptr, cwd, &start_info, &proc_info) != 0) {
+        api::CloseHandle(&proc_info.thread);
+
+        var process = Process {
+            id: proc_info.process.raw as u64,
+            stdin: Fd { handle: stdin_write_pipe },
+            stdout: Fd { handle: stdout_read_pipe },
+            stderr: Fd { handle: stderr_read_pipe },
+        };
+
+        result = process;
+    }
+    else {
+        if (info.stdin == Stdio::Pipe) api::CloseHandle(&stdin_write_pipe);
+        if (info.stdout == Stdio::Pipe) api::CloseHandle(&stdout_read_pipe);
+        if (info.stderr == Stdio::Pipe) api::CloseHandle(&stderr_read_pipe);
+    }
+
+    if (info.stdin == Stdio::Null || info.stdin == Stdio::Pipe) api::CloseHandle(&start_info.std_input);
+    if (info.stdout == Stdio::Null || info.stdout == Stdio::Pipe) api::CloseHandle(&start_info.std_output);
+    if (info.stderr == Stdio::Null || info.stderr == Stdio::Pipe) api::CloseHandle(&start_info.std_error);
+
+    // Free cwd
+    if (cwd != null) {
+        free(cwd);
+    }
+
+    // Free environment
+    if (info.env.size() > 0) {
+        environment.free();
+    }
+
+    // Free command line
+    cmd_line.free();
+
+    // Free application name
+    free(app_name);
+
+    return result;
+}
+
+func write_arg(str: mut &String, arg: StringView) {
+    if (str.size() > 0) {
+        str.write(" ");
+    }
+
+    // Empty
+    if (arg == "") {
+        str.write("\"\"");
+        return;
+    }
+
+    // Unescaped
+    if (!arg.contains(" ") && !arg.contains("\t") && !arg.contains("\"")) {
+        str.write(arg);
+        return;
+    }
+
+    // Escaped
+    str.write("\"");
+
+    var backslashes = 0u;
+
+    for (var i = 0u; i < arg.size; i++) {
+        var ch = arg[i];
+
+        if (ch == '\\') {
+            backslashes += 1;
+        }
+        else {
+            if (ch == '"') {
+                for (var j = 0u; j <= backslashes; j++) {
+                    str.write("\\");
+                }
+            }
+
+            backslashes = 0;
+        }
+
+        str.write(Slice:[u8] { ptr: &ch, size: 1 });
+    }
+
+    for (var j = 0u; j < backslashes; j++) {
+        str.write("\\");
+    }
+
+    str.write("\"");
+}
+
+pub func wait(pid: u64) ?ExitStatus {
+    var handle = api::Handle { raw: pid as *void };
+
+    // Wait for process to exit
+    {
+        var result = api::WaitForSingleObject(handle, 0xFFFFFFFF);
+        if (result == 0xFFFFFFFF) return Option:[ExitStatus]::none();
+    }
+
+    // Get exit code
+    var exit_code: u32;
+    var result = api::GetExitCodeProcess(handle, &exit_code);
+
+    // Close process handle
+    api::CloseHandle(&handle);
+
+    // Return
+    if (result == 0) return Option:[ExitStatus]::none();
+    return ExitStatus { raw: exit_code };
+}

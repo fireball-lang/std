@@ -57,6 +57,12 @@ impl[T] ArrayList[T] {
         return self.ptr[self.size - 1];
     }
 
+    pub func truncate(mut self, size: u64) {
+        if (size >= self.size) return;
+
+        self.size = size;
+    }
+
     pub func remove(mut self, index: u64) T {
         if (index >= self.size) {
             panic("ArrayList.remove() - invalid index");
