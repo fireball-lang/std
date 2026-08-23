@@ -1,0 +1,48 @@
+name: Test
+
+on:
+  - push
+  - pull_request
+  - workflow_dispatch
+
+jobs:
+  test:
+    strategy:
+      fail-fast: fast
+      matrix:
+        include:
+          - runs_on: windows-latest
+            target: "windows-amd64"
+            archive_ext: "zip"
+          - runs_on: ubuntu-latest
+            target: "linux-amd64"
+            archive_ext: "tar.gz"
+          - runs_on: macos-latest
+            target: "macos-aarch64"
+            archive_ext: "tar.gz"
+
+    runs-on: ${{ matrix.runs_on }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v7
+
+      - name: Download Fireball
+        uses: robinraju/release-downloader@v1
+        with:
+          repository: "fireball-lang/fireball"
+          tag: "development"
+          fileName: "fireball-${{ matrix.target }}.${{ matrix.archive_ext }}"
+          extract: true
+
+      - name: Add Fireball to PATH
+        shell: bash
+        run: echo "${{ github.workspace }}/fireball-${{ matrix.target }}" >> "$GITHUB_PATH"
+
+      - name: Run tests (debug)
+        shell: bash
+        run: fireball test
+
+      - name: Run tests (release)
+        shell: bash
+        run: fireball test -p release
