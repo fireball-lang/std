@@ -142,14 +142,10 @@ pub func mkdir(path: *u8, mode: u32) i32;
 #[extern]
 pub func rmdir(path: *u8) i32;
 
-#[extern, cfg(target_os = "linux")]
-pub func opendir(path: *u8) *void;
-#[extern, link_name("opendir$INODE64"), cfg(target_os = "macos")]
+#[extern]
 pub func opendir(path: *u8) *void;
 
-#[extern, cfg(target_os = "linux")]
-pub func readdir(dir: *void) *Dirent;
-#[extern, link_name("readdir$INODE64"), cfg(target_os = "macos")]
+#[extern]
 pub func readdir(dir: *void) *Dirent;
 
 #[extern]
@@ -170,9 +166,7 @@ pub func read(fd: i32, buffer: mut* void, size: u64) i64;
 #[extern]
 pub func write(fd: i32, data: *void, size: u64) i64;
 
-#[extern, cfg(target_os = "linux")]
-pub func fstatat(fd: i32, path: *u8, stat: mut *Stat, flags: i32) i32;
-#[extern, link_name("fstatat$INODE64"), cfg(target_os = "macos")]
+#[extern]
 pub func fstatat(fd: i32, path: *u8, stat: mut *Stat, flags: i32) i32;
 
 #[extern]
