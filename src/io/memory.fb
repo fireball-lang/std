@@ -1,0 +1,34 @@
+mod std::io;
+
+import std::io::{Reader};
+import std::c::{memcpy};
+
+/// Reads from an in-memory byte slice.
+pub struct MemoryReader {
+    data: []u8,
+    pos: u64,
+}
+
+impl MemoryReader {
+    /// Creates a new `MemoryReader` over the byte slice `data`.
+    pub func new(data: []u8) MemoryReader {
+        return MemoryReader {
+            data: data,
+            pos: 0,
+        };
+    }
+}
+
+impl MemoryReader : Reader {
+    pub func read(mut self, buffer: mut []u8) ?u64 {
+        if (self.pos >= self.data.size) return 0;
+
+        var n = buffer.size;
+        if (self.pos + n > self.data.size) n = self.data.size - self.pos;
+
+        memcpy(buffer.ptr, &self.data.ptr[self.pos], n);
+        self.pos += n;
+
+        return n;
+    }
+}
