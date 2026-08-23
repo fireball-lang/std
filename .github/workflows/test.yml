@@ -37,7 +37,7 @@ jobs:
 
       - name: Add Fireball to PATH
         shell: bash
-        run: echo "${{ github.workspace }}/fireball-${{ matrix.target }}" >> "$GITHUB_PATH"
+        run: echo "${{ github.workspace }}/fireball-${{ matrix.target }}/bin" >> "$GITHUB_PATH"
 
       - name: Run tests (debug)
         shell: bash
