@@ -1,7 +1,21 @@
 mod std;
 
+import std::fmt::{Formatter};
 import std::os::{stderr};
 import std::c::{exit};
+
+#[repr(C)]
+struct UnwindCtx {}
+
+enum UnwindCode : i32 {
+    NoReason = 0,
+}
+
+#[extern]
+func _Unwind_Backtrace(cb: func(ctx: *UnwindCtx, arg: *void) UnwindCode, arg: *void) UnwindCode;
+
+#[extern]
+func _Unwind_GetIP(ctx: *UnwindCtx) u64;
 
 #[init]
 func init_panic() {
@@ -15,5 +29,56 @@ func panic_handler(msg: StringView) {
     w.write(msg);
     w.write("\n");
 
+    var frame: u32;
+    _Unwind_Backtrace(backtrace_callback, &frame);
+
     exit(1);
+}
+
+func backtrace_callback(ctx: *UnwindCtx, arg: *void) UnwindCode {
+    var fmt = Formatter::new(stderr());
+    var frame = arg as mut *u32;
+
+    fmt.str("  [");
+    fmt.u64(*frame);
+    fmt.str("] ");
+    write_hex(fmt, _Unwind_GetIP(ctx));
+    fmt.str("\n");
+
+    (*frame)++;
+
+    return UnwindCode::NoReason;
+}
+
+func write_hex(fmt: Formatter, val: u64) {
+    if (val == 0) {
+        fmt.str("0x0");
+        return;
+    }
+
+    fmt.str("0x");
+
+    var buf: [16]u8;
+
+    var i: u32 = 16;
+    var temp = val;
+
+    while (temp > 0) {
+        i = i - 1;
+
+        // Get the lowest 4 bits (values 0 through 15)
+        var digit = (temp & 0xF) as u8;
+
+        // Convert to ASCII
+        if (digit < 10) {
+            buf[i] = '0' + digit;
+        } else {
+            buf[i] = ('A' - 10u) + digit;
+        }
+
+        // Shift right by 4 bits to process the next hex digit
+        temp = temp >> 4;
+    }
+
+    fmt.str(StringView { ptr: &buf[i], size: 16 - i });
 }
