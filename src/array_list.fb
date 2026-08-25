@@ -1,7 +1,7 @@
 mod std;
 
 import std::json::{Serialize, Serializer, Deserialize, Deserializer, TokenKind};
-import std::c::{malloc, free, memcpy, memmove};
+import std::c::{malloc, free};
 
 pub struct ArrayList[T] {
     ptr: mut *T,

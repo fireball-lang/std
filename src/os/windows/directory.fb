@@ -3,13 +3,13 @@
 mod std::os::windows;
 
 import std::os::windows::{get_file_info};
-import std::c::{to_cstring, from_cstring, malloc, free, memcpy};
+import std::c::{to_cstring, from_cstring, malloc, free};
 import std::os::{FileKind, FileInfo};
-import std::os::windows::api;
+import std::sys;
 
 pub func create_dir(path: StringView) ?bool {
     var c_path = to_cstring(path);
-    var result = api::CreateDirectoryA(c_path, null);
+    var result = sys::CreateDirectoryA(c_path, null);
     free(c_path);
 
     if (result == 0) return Option:[bool]::none();
@@ -18,7 +18,7 @@ pub func create_dir(path: StringView) ?bool {
 
 pub func delete_dir(path: StringView) ?bool {
     var c_path = to_cstring(path);
-    var result = api::RemoveDirectoryA(c_path);
+    var result = sys::RemoveDirectoryA(c_path);
     free(c_path);
 
     if (result == 0) return Option:[bool]::none();
@@ -39,8 +39,8 @@ impl DirEntryInfo {
 }
 
 pub struct DirIterator {
-    handle: api::Handle,
-    data: api::FindData,
+    handle: sys::Handle,
+    data: sys::FindData,
     first: bool,
 }
 
@@ -57,9 +57,9 @@ pub func list_dir(path: StringView) ?DirIterator {
     c_path[path.size + slash + 1] = 0;
 
     // Call native API
-    var data: api::FindData;
+    var data: sys::FindData;
 
-    var handle = api::FindFirstFileA(c_path, &data);
+    var handle = sys::FindFirstFileA(c_path, &data);
     free(c_path);
 
     if (!handle.valid()) return Option:[DirIterator]::none();
@@ -79,8 +79,8 @@ impl DirIterator {
         for (;;) {
             // Get entry
             if (!self.first) {
-                if (api::FindNextFileA(self.handle, &self.data) == 0) {
-                    api::FindClose(&self.handle);
+                if (sys::FindNextFileA(self.handle, &self.data) == 0) {
+                    sys::FindClose(&self.handle);
                     return "";
                 }
             }

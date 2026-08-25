@@ -3,7 +3,7 @@
 mod std::os::unix;
 
 import std::c::{to_cstring, free};
-import std::os::unix::api;
+import std::sys;
 
 pub struct Library {
     handle: *void,
@@ -12,7 +12,7 @@ pub struct Library {
 impl Library {
     pub func open(name: StringView) ?Self {
         var c_name = to_cstring(name);
-        var handle = api::dlopen(c_name, api::LibFlags::Lazy | api::LibFlags::Local);
+        var handle = sys::dlopen(c_name, sys::LibFlags::Lazy | sys::LibFlags::Local);
         free(c_name);
 
         if (handle == null) {
@@ -26,7 +26,7 @@ impl Library {
 
     pub func get(self, name: StringView) ?&void {
         var c_name = to_cstring(name);
-        var symbol = api::dlsym(self.handle, c_name);
+        var symbol = sys::dlsym(self.handle, c_name);
         free(c_name);
 
         if (symbol == null) {
@@ -39,7 +39,7 @@ impl Library {
     pub func close(mut self) {
         if (self.handle == null) panic("tried to close an already closed Library");
 
-        api::dlclose(self.handle);
+        sys::dlclose(self.handle);
         self.handle = null;
     }
 }

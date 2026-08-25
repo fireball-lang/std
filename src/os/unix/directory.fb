@@ -2,14 +2,14 @@
 
 mod std::os::unix;
 
-import std::c::{to_cstring, from_cstring, malloc, free, memcpy};
+import std::c::{to_cstring, from_cstring, malloc, free};
 import std::os::{FileKind, FileInfo};
 import std::os::unix::{stat};
-import std::os::unix::api;
+import std::sys;
 
 pub func create_dir(path: StringView) ?bool {
     var c_path = to_cstring(path);
-    var result = api::mkdir(c_path, 511);
+    var result = sys::mkdir(c_path, 511);
     free(c_path);
 
     if (result == -1) return Option:[bool]::none();
@@ -18,7 +18,7 @@ pub func create_dir(path: StringView) ?bool {
 
 pub func delete_dir(path: StringView) ?bool {
     var c_path = to_cstring(path);
-    var result = api::rmdir(c_path);
+    var result = sys::rmdir(c_path);
     free(c_path);
 
     if (result == -1) return Option:[bool]::none();
@@ -50,7 +50,7 @@ pub struct DirIterator {
 
 pub func list_dir(path: StringView) ?DirIterator {
     var c_path = to_cstring(path);
-    var dir = api::opendir(c_path);
+    var dir = sys::opendir(c_path);
 
     if (dir == null) {
         free(c_path);
@@ -68,12 +68,12 @@ impl DirIterator {
         if (self.dir == null) return "";
 
         for (;;) {
-            var dirent = api::readdir(self.dir);
+            var dirent = sys::readdir(self.dir);
 
             // EOF
             if (dirent == null) {
                 free(self.path.ptr);
-                api::closedir(self.dir);
+                sys::closedir(self.dir);
 
                 self.dir = null;
                 return "";

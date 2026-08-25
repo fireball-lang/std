@@ -2,27 +2,10 @@
 
 mod std::net::windows;
 
-import std::net::windows::{SocketAddress, Domain, Type, ensure_wsa_initialized};
+import std::net::windows::{ensure_wsa_initialized};
+import std::sys;
 
-#[repr(C)]
-pub struct DnsEntry {
-    pub flags: i32,
-    pub family: Domain,
-    pub socktype: Type,
-    pub protocol: i32,
-    pub addrlen: u64,
-    pub canonname: *u8,
-    pub addr: *SocketAddress,
-    pub next: *DnsEntry,
-}
-
-#[extern, link_name("getaddrinfo")]
-func getaddrinfo_(name: *u8, service: *u8, hints: *DnsEntry, result: mut** DnsEntry) i32;
-
-#[extern]
-pub func freeaddrinfo(result: *DnsEntry);
-
-pub func getaddrinfo(name: *u8, service: *u8, hints: *DnsEntry, result: mut** DnsEntry) i32 {
+pub func getaddrinfo(name: *u8, service: *u8, hints: *sys::DnsEntry, result: mut **sys::DnsEntry) i32 {
     ensure_wsa_initialized();
-    return getaddrinfo_(name, service, hints, result);
+    return sys::getaddrinfo(name, service, hints, result);
 }

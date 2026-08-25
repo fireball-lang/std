@@ -3,26 +3,21 @@
 mod std::time::windows;
 
 import std::time::{Duration};
-
-#[extern]
-func QueryPerformanceCounter(lpPerformanceCount: mut* u64) i32;
-
-#[extern]
-func QueryPerformanceFrequency(lpFrequency: mut* u64) i32;
+import std::sys;
 
 var QPC_FREQUENCY: u64;
 
 #[init]
 func init_time_constants() {
     var freq = 0u as u64;
-    QueryPerformanceFrequency(&freq);
+    sys::QueryPerformanceFrequency(&freq);
 
     QPC_FREQUENCY = freq;
 }
 
 pub func now() u64 {
     var ticks = 0u as u64;
-    QueryPerformanceCounter(&ticks);
+    sys::QueryPerformanceCounter(&ticks);
 
     return ticks;
 }

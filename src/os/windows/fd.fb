@@ -5,16 +5,16 @@ mod std::os::windows;
 import std::os::{Seek, FileKind, FileInfo};
 import std::c::{to_cstring, free};
 import std::io::{Reader, Writer};
-import std::os::windows::api;
+import std::sys;
 
 pub struct Fd {
-    handle: api::Handle,
+    handle: sys::Handle,
 }
 
 impl Fd {
     pub func create(path: StringView) ?Fd {
         var path_c = to_cstring(path);
-        var handle = api::CreateFileA(path_c, api::Access::Write, api::Share::Exclusive, null, api::Disposition::CreateAlways, api::Flags::Normal, null);
+        var handle = sys::CreateFileA(path_c, sys::Access::Write, sys::Share::Exclusive, null, sys::Disposition::CreateAlways, sys::Flags::Normal, null);
         free(path_c);
 
         if (!handle.valid()) return Option:[Fd]::none();
@@ -23,7 +23,7 @@ impl Fd {
 
     pub func open(path: StringView) ?Fd {
         var path_c = to_cstring(path);
-        var handle = api::CreateFileA(path_c, api::Access::Read, api::Share::Read, null, api::Disposition::OpenExisting, api::Flags::Normal, null);
+        var handle = sys::CreateFileA(path_c, sys::Access::Read, sys::Share::Read, null, sys::Disposition::OpenExisting, sys::Flags::Normal, null);
         free(path_c);
 
         if (!handle.valid()) return Option:[Fd]::none();
@@ -31,31 +31,31 @@ impl Fd {
     }
 
     pub func stdin() Fd {
-        return Fd { handle: api::GetStdHandle(-10 as u32) };
+        return Fd { handle: sys::GetStdHandle(-10 as u32) };
     }
 
     pub func stdout() Fd {
-        return Fd { handle: api::GetStdHandle(-11 as u32) };
+        return Fd { handle: sys::GetStdHandle(-11 as u32) };
     }
 
     pub func stderr() Fd {
-        return Fd { handle: api::GetStdHandle(-12 as u32) };
+        return Fd { handle: sys::GetStdHandle(-12 as u32) };
     }
 
     pub func invalid() Fd {
-        return Fd { handle: api::Handle::invalid() };
+        return Fd { handle: sys::Handle::invalid() };
     }
 
     pub func close(mut self) {
         if (!self.handle.valid()) return;
 
-        api::CloseHandle(&self.handle);
+        sys::CloseHandle(&self.handle);
     }
 
     pub func seek(mut self, mode: Seek, offset: i64) ?u64 {
         var new_pos: i64 = 0;
 
-        if (api::SetFilePointerEx(self.handle, offset, &new_pos, mode as u32) == 0) {
+        if (sys::SetFilePointerEx(self.handle, offset, &new_pos, mode as u32) == 0) {
             return Option:[u64]::none();
         }
 
@@ -69,7 +69,7 @@ impl Fd : Reader {
 
         var bytes_read: u32 = 0u;
 
-        if (api::ReadFile(self.handle, buffer.ptr, buffer.size as u32, &bytes_read, null) == 0) {
+        if (sys::ReadFile(self.handle, buffer.ptr, buffer.size as u32, &bytes_read, null) == 0) {
             return Option:[u64]::none();
         }
 
@@ -83,7 +83,7 @@ impl Fd : Writer {
 
         var bytes_written: u32 = 0u;
 
-        if (api::WriteFile(self.handle, data.ptr, data.size as u32, &bytes_written, null) == 0) {
+        if (sys::WriteFile(self.handle, data.ptr, data.size as u32, &bytes_written, null) == 0) {
             return Option:[u64]::none();
         }
 
@@ -93,8 +93,8 @@ impl Fd : Writer {
 
 pub func stat(path: *u8) ?FileInfo {
     // Call native API
-    var data: api::FileAttributeData;
-    var result = api::GetFileAttributesExA(path, 0, &data);
+    var data: sys::FileAttributeData;
+    var result = sys::GetFileAttributesExA(path, 0, &data);
 
     if (result == 0) return Option:[FileInfo]::none();
 
@@ -102,7 +102,7 @@ pub func stat(path: *u8) ?FileInfo {
     return get_file_info(data);
 }
 
-pub func get_file_info(data: api::FileAttributeData) FileInfo {
+pub func get_file_info(data: sys::FileAttributeData) FileInfo {
     var kind = FileKind::File;
 
     if ((data.file_attributes & 0x00000010) != 0) kind = FileKind::Directory;

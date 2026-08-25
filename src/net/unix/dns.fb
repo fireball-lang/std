@@ -2,22 +2,8 @@
 
 mod std::net::unix;
 
-import std::net::unix::{SocketAddress, Domain, Type};
+import std::sys;
 
-#[repr(C)]
-pub struct DnsEntry {
-    pub flags: i32,
-    pub family: Domain,
-    pub socktype: Type,
-    pub protocol: i32,
-    pub addrlen: u32,
-    pub addr: *SocketAddress,
-    pub canonname: *u8,
-    pub next: *DnsEntry,
+pub func getaddrinfo(name: *u8, service: *u8, hints: *sys::DnsEntry, result: mut **sys::DnsEntry) i32 {
+    return sys::getaddrinfo(name, service, hints, result);
 }
-
-#[extern]
-pub func getaddrinfo(name: *u8, service: *u8, hints: *DnsEntry, result: mut** DnsEntry) i32;
-
-#[extern]
-pub func freeaddrinfo(result: *DnsEntry);

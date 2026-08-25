@@ -1,0 +1,285 @@
+#[cfg(target_os = "macos")]
+
+mod std::sys;
+
+// Enums
+
+pub enum FileFlags : i32 {
+    ReadOnly = 0,
+    WriteOnly = 1,
+    Create = 512,
+    Truncate = 1024,
+    CloseOnExec = 16777216,
+}
+
+impl FileFlags : BitOr[FileFlags] {
+    type Result = FileFlags;
+
+    pub func bit_or(self, rhs: Self) Self {
+        return (*self as i32 | rhs as i32) as Self;
+    }
+}
+
+pub enum LibFlags : i32 {
+    Lazy = 0x00001,
+    Now = 0x00002,
+    NoLoad = 0x00010,
+
+    Global = 0x00008,
+    Local = 0x0004,
+
+    NoDelete = 0x00080,
+}
+
+impl LibFlags : BitOr[LibFlags] {
+    type Result = LibFlags;
+
+    pub func bit_or(self, rhs: Self) Self {
+        return (*self as i32 | rhs as i32) as Self;
+    }
+}
+
+pub enum Domain : i32 {
+    IP4 = 2,
+    IP6 = 10,
+}
+
+pub enum Type : i32 {
+    TCP = 1,
+    UDP = 2,
+}
+
+pub enum Protocol : i32 {
+    IP = 0,
+}
+
+// Structs
+
+#[repr(C)]
+pub struct Dirent {
+    pub ino: u64,
+    pub off: u64,
+    pub reclen: u16,
+    pub namlen: u16,
+    pub type_: u8,
+    pub name: [1024]u8,
+}
+
+#[repr(C)]
+pub struct Timespec {
+    pub sec: i64,
+    pub nsec: i64,
+}
+
+#[repr(C)]
+pub struct Stat {
+    pub dev: i32,
+    pub mode: u16,
+    pub nlink: u16,
+    pub ino: u64,
+    pub uid: u32,
+    pub gid: u32,
+    pub rdev: i32,
+
+    pub atim: Timespec,
+    pub mtim: Timespec,
+    pub ctim: Timespec,
+    pub birthtim: Timespec,
+
+    pub size: u64,
+    pub blocks: u64,
+    pub blksize: u32,
+    pub flags: u32,
+    pub gen: u32,
+
+    pub lspare: i32,
+    pub qspare: [2]i64,
+}
+
+#[repr(C)]
+pub struct MachTimebaseInfo {
+    pub numer: u32,
+    pub denom: u32,
+}
+
+#[repr(C)]
+pub struct SocketAddress {
+    pub domain: u16,
+    port: u16,
+    pub ip: [4]u8,
+
+    _pad: [8]u8,
+}
+
+impl SocketAddress {
+    pub func new(domain: Domain, ip: [4]u8, port: u16) Self {
+        return Self {
+            domain: domain as u16,
+            port: ((port >> 8u) & 0xFF) | ((port & 0xFF) << 8u),
+            ip: ip,
+        };
+    }
+
+    pub func port(self) u16 {
+        return ((self.port >> 8u) & 0xFF) | ((self.port & 0xFF) << 8u);
+    }
+}
+
+#[repr(C)]
+pub struct DnsEntry {
+    pub flags: i32,
+    pub family: Domain,
+    pub socktype: Type,
+    pub protocol: i32,
+    pub addrlen: u32,
+    pub addr: *SocketAddress,
+    pub canonname: *u8,
+    pub next: *DnsEntry,
+}
+
+#[repr(C)]
+pub struct SslCtx {}
+
+// Posix functions
+
+#[extern]
+pub func getcwd(buffer: mut *u8, size: u64) *u8;
+
+#[extern]
+pub func mkdir(path: *u8, mode: u32) i32;
+
+#[extern]
+pub func rmdir(path: *u8) i32;
+
+#[extern]
+pub func opendir(path: *u8) *void;
+
+#[extern]
+pub func readdir(dir: *void) *Dirent;
+
+#[extern]
+pub func closedir(dir: *void) i32;
+
+#[extern]
+pub func openat(fd: i32, path: *u8, flags: FileFlags, mode: i32) i32;
+
+#[extern]
+pub func close(fd: i32) i32;
+
+#[extern]
+pub func lseek(fd: i32, offset: i64, whence: i32) i64;
+
+#[extern]
+pub func read(fd: i32, buffer: mut *void, size: u64) i64;
+
+#[extern]
+pub func write(fd: i32, data: *void, size: u64) i64;
+
+#[extern]
+pub func fstatat(fd: i32, path: *u8, stat: mut *Stat, flags: i32) i32;
+
+#[extern]
+pub func open(path: *u8, flags: FileFlags) i32;
+
+#[extern]
+pub func fcntl(fd: i32, cmd: i32, arg: i32) i32;
+
+#[extern]
+pub func pipe(fds: mut *i32) i32;
+
+#[extern]
+pub func dup2(oldfd: i32, newfd: i32) i32;
+
+#[extern]
+pub func fork() i32;
+
+#[extern]
+pub func chdir(path: *u8) i32;
+
+#[extern]
+pub func execve(file: *u8, argv: **u8, envp: **u8) i32;
+
+#[extern]
+pub func waitpid(pid: i32, status: mut *i32, options: i32) i32;
+
+#[extern]
+pub func exit(code: i32);
+
+#[extern]
+pub func mach_continuous_time() u64;
+
+#[extern]
+pub func mach_timebase_info(info: mut *MachTimebaseInfo) i32;
+
+#[extern]
+pub func socket(domain: Domain, type_: Type, protocol: Protocol) i32;
+
+#[extern]
+pub func bind(fd: i32, addr: *SocketAddress, len: u32) i32;
+
+#[extern]
+pub func connect(fd: i32, addr: *SocketAddress, len: u32) i32;
+
+#[extern]
+pub func listen(fd: i32, backlog: i32) i32;
+
+#[extern]
+pub func accept(fd: i32, addr: mut *SocketAddress, len: mut *u32) i32;
+
+#[extern]
+pub func send(fd: i32, buf: *void, len: u64, flags: i32) i64;
+
+#[extern]
+pub func recv(fd: i32, buf: mut *void, len: u64, flags: i32) i64;
+
+// LibC
+
+#[extern]
+pub func dlopen(name: *u8, flags: LibFlags) *void;
+
+#[extern]
+pub func dlsym(handle: *void, name: *u8) *void;
+
+#[extern]
+pub func dlclose(handle: *void) i32;
+
+#[extern]
+pub func getaddrinfo(name: *u8, service: *u8, hints: *DnsEntry, result: mut **DnsEntry) i32;
+
+#[extern]
+pub func freeaddrinfo(result: *DnsEntry);
+
+// Secure channel
+
+#[extern]
+pub func SSLCreateContext(alloc: *void, protocolSide: i32, connectionType: i32) *SslCtx;
+
+#[extern]
+pub func SSLSetIOFuncs(ctx: *SslCtx, read_func: func(*void, mut* void, mut* u64) i32, write_func: func(*void, *void, mut* u64) i32) i32;
+
+#[extern]
+pub func SSLSetConnection(ctx: *SslCtx, connection: *void) i32;
+
+#[extern]
+pub func SSLSetPeerDomainName(ctx: *SslCtx, peerName: *void, peerNameLen: u64) i32;
+
+#[extern]
+pub func SSLHandshake(ctx: *SslCtx) i32;
+
+#[extern]
+pub func SSLRead(ctx: *SslCtx, data: mut* void, dataLen: u64, processed: mut* u64) i32;
+
+#[extern]
+pub func SSLWrite(ctx: *SslCtx, data: *void, dataLen: u64, processed: mut* u64) i32;
+
+#[extern]
+pub func SSLClose(ctx: *SslCtx) i32;
+
+#[extern]
+pub func CFRelease(cf: *void);
+
+// Utils
+
+pub func at_fdcwd() i32 {
+    return -2;
+}

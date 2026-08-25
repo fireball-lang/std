@@ -3,94 +3,15 @@
 mod std::net::windows;
 
 import std::c::{printf, exit};
-
-// Bindings
-
-#[repr(C)]
-pub struct WsaData {
-    pub version: u16,
-    pub high_version: u16,
-    pub max_sockets: u16,
-    pub max_udp_dg: u16,
-    pub vendor_info: *u8,
-    pub description: [257]u8,
-    pub system_status: [129]u8,
-}
-
-pub enum Domain : i32 {
-    IP4 = 2,
-    IP6 = 23,
-}
-
-pub enum Type : i32 {
-    TCP = 1,
-    UDP = 2,
-}
-
-pub enum Protocol : i32 {
-    IP = 6,
-    UDP = 17,
-}
-
-#[repr(C)]
-pub struct SocketAddress {
-    pub domain: u16,
-    port: u16,
-    pub ip: [4]u8,
-
-    _pad: [8]u8,
-}
-
-impl SocketAddress {
-    pub func new(domain: Domain, ip: [4]u8, port: u16) Self {
-        return Self {
-            domain: domain as u16,
-            port: ((port >> 8u) & 0xFF) | ((port & 0xFF) << 8u),
-            ip: ip,
-        };
-    }
-
-    pub func port(self) u16 {
-        return ((self.port >> 8u) & 0xFF) | ((self.port & 0xFF) << 8u);
-    }
-}
-
-#[extern, link_name("WSAStartup")]
-pub func wsa_startup(version: u16, data: mut* WsaData) i32;
-
-#[extern]
-pub func socket(domain: Domain, type_: Type, protocol: Protocol) u64;
-
-#[extern]
-pub func bind(fd: u64, addr: *SocketAddress, len: i32) i32;
-
-#[extern]
-pub func connect(fd: u64, addr: *SocketAddress, len: i32) i32;
-
-#[extern]
-pub func listen(fd: u64, backlog: i32) i32;
-
-#[extern]
-pub func accept(fd: u64, addr: mut* SocketAddress, len: mut* i32) u64;
-
-#[extern]
-pub func send(fd: u64, buf: *void, len: i32, flags: i32) i32;
-
-#[extern]
-pub func recv(fd: u64, buf: mut* void, len: i32, flags: i32) i32;
-
-#[extern]
-pub func closesocket(fd: u64) i32;
-
-// SocketFd
+import std::sys;
 
 var wsa_initialized: bool;
 
 func ensure_wsa_initialized() {
     if (wsa_initialized) return;
 
-    var data: WsaData;
-    var error = wsa_startup(2u, &data);
+    var data: sys::WsaData;
+    var error = sys::wsa_startup(2u, &data);
 
     if (error != 0) {
         panic("Failed to initialize WinSock2");
@@ -104,19 +25,19 @@ pub struct SocketFd {
 }
 
 impl SocketFd {
-    pub func new(domain: Domain, type_: Type, protocol: Protocol) ?Self {
+    pub func new(domain: sys::Domain, type_: sys::Type, protocol: sys::Protocol) ?Self {
         ensure_wsa_initialized();
 
-        var fd = socket(domain, type_, protocol);
+        var fd = sys::socket(domain, type_, protocol);
         if (fd == 0xFFFFFFFFFFFFFFFF) return Option:[Self]::none();
 
         return Self { fd: fd };
     }
 
-    pub func connect(address: SocketAddress) ?Self {
-        var fd = Self::new(address.domain as Domain, Type::TCP, Protocol::IP)?;
+    pub func connect(address: sys::SocketAddress) ?Self {
+        var fd = Self::new(address.domain as sys::Domain, sys::Type::TCP, sys::Protocol::IP)?;
 
-        if (connect(fd.fd, &address, sizeof(SocketAddress) as i32) < 0) {
+        if (sys::connect(fd.fd, &address, sizeof(sys::SocketAddress) as i32) < 0) {
             fd.close();
             return Option:[Self]::none();
         }
@@ -124,14 +45,14 @@ impl SocketFd {
         return fd;
     }
 
-    pub func listen(address: SocketAddress) ?Self {
-        var fd = Self::new(address.domain as Domain, Type::TCP, Protocol::IP)?;
+    pub func listen(address: sys::SocketAddress) ?Self {
+        var fd = Self::new(address.domain as sys::Domain, sys::Type::TCP, sys::Protocol::IP)?;
 
-        if (bind(fd.fd, &address, sizeof(SocketAddress) as i32) < 0) {
+        if (sys::bind(fd.fd, &address, sizeof(sys::SocketAddress) as i32) < 0) {
             fd.close();
             return Option:[Self]::none();
         }
-        else if (listen(fd.fd, 64) < 0) {
+        else if (sys::listen(fd.fd, 64) < 0) {
             fd.close();
             return Option:[Self]::none();
         }
@@ -143,10 +64,10 @@ impl SocketFd {
         return self.fd != 0xFFFFFFFFFFFFFFFF;
     }
 
-    pub func accept(self, address: mut* SocketAddress, address_len: mut* u32) ?Self {
+    pub func accept(self, address: mut* sys::SocketAddress, address_len: mut* u32) ?Self {
         var address_len_i32 = *address_len as i32;
 
-        var fd = accept(self.fd, address, &address_len_i32);
+        var fd = sys::accept(self.fd, address, &address_len_i32);
         if (fd == 0xFFFFFFFFFFFFFFFF) return Option:[Self]::none();
 
         *address_len = address_len_i32 as u32;
@@ -159,7 +80,7 @@ impl SocketFd {
 
         // Send
         if (data.size == 0u) return 0u;
-        var sent = send(self.fd, data.ptr, data.size as i32, 0);
+        var sent = sys::send(self.fd, data.ptr, data.size as i32, 0);
 
         // Some amount of bytes sent
         if (sent > 0) {
@@ -175,7 +96,7 @@ impl SocketFd {
 
         // Receive
         if (buffer.size == 0u) return 0u;
-        var read = recv(self.fd, buffer.ptr, buffer.size as i32, 0);
+        var read = sys::recv(self.fd, buffer.ptr, buffer.size as i32, 0);
 
         // Some amount of bytes read
         if (read > 0) {
@@ -193,7 +114,7 @@ impl SocketFd {
 
     pub func close(mut self) {
         if (self.is_open()) {
-            closesocket(self.fd);
+            sys::closesocket(self.fd);
             self.fd = 0xFFFFFFFFFFFFFFFF;
         }
     }

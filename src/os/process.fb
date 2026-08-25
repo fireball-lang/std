@@ -3,6 +3,7 @@ mod std::os;
 import std::{ArrayList, ArrayMap, String};
 import std::io::{Reader, Writer};
 import std::os::{lookup_path};
+import std::sys;
 
 #[cfg(target_family="windows")]
 import std::os::windows as imp;
@@ -142,6 +143,19 @@ impl Process {
     }
 }
 
+/// Exits the current process with the specified exit code.
+#[cfg(target_family = "windows")]
+pub func exit(code: u8) {
+    sys::exit(code);
+}
+
+/// Exits the current process with the specified exit code.
+#[cfg(target_family = "unix")]
+pub func exit(code: u8) {
+    sys::exit(code as i32);
+}
+
+/// Spawns a new process according to a provided `ProcessInfo`.
 pub func spawn(info: ProcessInfo) ?Process {
     var path_opt: ?String;
 

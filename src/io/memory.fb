@@ -1,7 +1,6 @@
 mod std::io;
 
 import std::io::{Reader};
-import std::c::{memcpy};
 
 /// Reads from an in-memory byte slice.
 pub struct MemoryReader {

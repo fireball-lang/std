@@ -1,6 +1,6 @@
-#[cfg(target_family = "windows")]
+#[cfg(target_os = "windows")]
 
-mod std::os::windows::api;
+mod std::sys;
 
 // Enums
 
@@ -88,6 +88,21 @@ impl HandleFlags : BitOr[HandleFlags] {
     }
 }
 
+pub enum Domain : i32 {
+    IP4 = 2,
+    IP6 = 23,
+}
+
+pub enum Type : i32 {
+    TCP = 1,
+    UDP = 2,
+}
+
+pub enum Protocol : i32 {
+    IP = 6,
+    UDP = 17,
+}
+
 // Structs
 
 #[repr(C)]
@@ -157,6 +172,81 @@ pub struct ProcessInformation {
     pub thread: Handle,
     pub process_id: u32,
     pub thread_id: u32,
+}
+
+#[repr(C)]
+pub struct WsaData {
+    pub version: u16,
+    pub high_version: u16,
+    pub max_sockets: u16,
+    pub max_udp_dg: u16,
+    pub vendor_info: *u8,
+    pub description: [257]u8,
+    pub system_status: [129]u8,
+}
+
+#[repr(C)]
+pub struct SocketAddress {
+    pub domain: u16,
+    port: u16,
+    pub ip: [4]u8,
+
+    _pad: [8]u8,
+}
+
+impl SocketAddress {
+    pub func new(domain: Domain, ip: [4]u8, port: u16) Self {
+        return Self {
+            domain: domain as u16,
+            port: ((port >> 8u) & 0xFF) | ((port & 0xFF) << 8u),
+            ip: ip,
+        };
+    }
+
+    pub func port(self) u16 {
+        return ((self.port >> 8u) & 0xFF) | ((self.port & 0xFF) << 8u);
+    }
+}
+
+#[repr(C)]
+pub struct DnsEntry {
+    pub flags: i32,
+    pub family: Domain,
+    pub socktype: Type,
+    pub protocol: i32,
+    pub addrlen: u64,
+    pub canonname: *u8,
+    pub addr: *SocketAddress,
+    pub next: *DnsEntry,
+}
+
+#[repr(C)]
+pub struct SecHandle {
+    pub dwLower: u64,
+    pub dwUpper: u64,
+}
+
+#[repr(C)]
+pub struct SecBuffer {
+    pub cbBuffer: u32,
+    pub BufferType: u32,
+    pub pvBuffer: *void,
+}
+
+#[repr(C)]
+pub struct SecBufferDesc {
+    pub ulVersion: u32,
+    pub cBuffers: u32,
+    pub pBuffers: *SecBuffer,
+}
+
+#[repr(C)]
+pub struct SecPkgContext_StreamSizes {
+    pub cbHeader: u32,
+    pub cbTrailer: u32,
+    pub cbMaximumMessage: u32,
+    pub cBuffers: u32,
+    pub cbBlockSize: u32,
 }
 
 #[repr(C)]
@@ -267,3 +357,69 @@ pub func WaitForSingleObject(handle: Handle, ms: u32) u32;
 
 #[extern]
 pub func GetExitCodeProcess(process: Handle, exit_code: mut *u32) i32;
+
+#[extern]
+pub func ExitProcess(code: u32);
+
+#[extern]
+pub func QueryPerformanceCounter(lpPerformanceCount: mut *u64) i32;
+
+#[extern]
+pub func QueryPerformanceFrequency(lpFrequency: mut *u64) i32;
+
+#[extern, link_name("WSAStartup")]
+pub func wsa_startup(version: u16, data: mut* WsaData) i32;
+
+#[extern]
+pub func socket(domain: Domain, type_: Type, protocol: Protocol) u64;
+
+#[extern]
+pub func bind(fd: u64, addr: *SocketAddress, len: i32) i32;
+
+#[extern]
+pub func connect(fd: u64, addr: *SocketAddress, len: i32) i32;
+
+#[extern]
+pub func listen(fd: u64, backlog: i32) i32;
+
+#[extern]
+pub func accept(fd: u64, addr: mut* SocketAddress, len: mut* i32) u64;
+
+#[extern]
+pub func send(fd: u64, buf: *void, len: i32, flags: i32) i32;
+
+#[extern]
+pub func recv(fd: u64, buf: mut* void, len: i32, flags: i32) i32;
+
+#[extern]
+pub func closesocket(fd: u64) i32;
+
+#[extern]
+pub func getaddrinfo(name: *u8, service: *u8, hints: *DnsEntry, result: mut** DnsEntry) i32;
+
+#[extern]
+pub func freeaddrinfo(result: *DnsEntry);
+
+#[extern]
+pub func AcquireCredentialsHandleA(pszPrincipal: *void, pszPackage: *void, fCredentialUse: u32, pvLogonID: *void, pAuthData: *void, pGetKeyFn: *void, pvGetKeyArgument: *void, phCredential: *SecHandle, ptsExpiry: *void) i32;
+
+#[extern]
+pub func InitializeSecurityContextA(phCredential: *SecHandle, phContext: *SecHandle, pszTargetName: *void, fContextReq: u32, Reserved1: u32, TargetDataRep: u32, pInput: *SecBufferDesc, Reserved2: u32, phNewContext: *SecHandle, pOutput: *SecBufferDesc, pfContextAttr: mut* u32, ptsExpiry: *void) i32;
+
+#[extern]
+pub func QueryContextAttributesA(phContext: *SecHandle, ulAttribute: u32, pBuffer: *void) i32;
+
+#[extern]
+pub func EncryptMessage(phContext: *SecHandle, fQOP: u32, pMessage: *SecBufferDesc, MessageSeqNo: u32) i32;
+
+#[extern]
+pub func DecryptMessage(phContext: *SecHandle, pMessage: *SecBufferDesc, MessageSeqNo: u32, pfQOP: mut* u32) i32;
+
+#[extern]
+pub func DeleteSecurityContext(phContext: *SecHandle) i32;
+
+#[extern]
+pub func FreeCredentialsHandle(phCredential: *SecHandle) i32;
+
+#[extern]
+pub func FreeContextBuffer(pvContextBuffer: *void) i32;

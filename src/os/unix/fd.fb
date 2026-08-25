@@ -5,7 +5,7 @@ mod std::os::unix;
 import std::os::{Seek, FileKind, FileInfo};
 import std::c::{to_cstring, free};
 import std::io::{Reader, Writer};
-import std::os::unix::api;
+import std::sys;
 
 pub struct Fd {
     handle: i32,
@@ -14,7 +14,7 @@ pub struct Fd {
 impl Fd {
     pub func create(path: StringView) ?Fd {
         var path_c = to_cstring(path);
-        var handle = api::openat(api::at_fdcwd(), path_c, api::FileFlags::Create | api::FileFlags::Truncate | api::FileFlags::WriteOnly | api::FileFlags::CloseOnExec, 438);
+        var handle = sys::openat(sys::at_fdcwd(), path_c, sys::FileFlags::Create | sys::FileFlags::Truncate | sys::FileFlags::WriteOnly | sys::FileFlags::CloseOnExec, 438);
         free(path_c);
 
         if (handle < 0) return Option:[Fd]::none();
@@ -23,7 +23,7 @@ impl Fd {
 
     pub func open(path: StringView) ?Fd {
         var path_c = to_cstring(path);
-        var handle = api::openat(api::at_fdcwd(), path_c, api::FileFlags::ReadOnly | api::FileFlags::CloseOnExec, 0);
+        var handle = sys::openat(sys::at_fdcwd(), path_c, sys::FileFlags::ReadOnly | sys::FileFlags::CloseOnExec, 0);
         free(path_c);
 
         if (handle < 0) return Option:[Fd]::none();
@@ -49,12 +49,12 @@ impl Fd {
     pub func close(mut self) {
         if (self.handle == -1) return;
 
-        api::close(self.handle);
+        sys::close(self.handle);
         self.handle = -1;
     }
 
     pub func seek(mut self, mode: Seek, offset: i64) ?u64 {
-        var position = api::lseek(self.handle, offset, mode as i32);
+        var position = sys::lseek(self.handle, offset, mode as i32);
         if (position < 0) return Option:[u64]::none();
 
         return position as u64;
@@ -63,7 +63,7 @@ impl Fd {
 
 impl Fd : Reader {
     pub func read(mut self, buffer: mut []u8) ?u64 {
-        var read = api::read(self.handle, buffer.ptr, buffer.size);
+        var read = sys::read(self.handle, buffer.ptr, buffer.size);
         if (read < 0) return Option:[u64]::none();
 
         return read as u64;
@@ -72,7 +72,7 @@ impl Fd : Reader {
 
 impl Fd : Writer {
     pub func write(mut self, data: []u8) ?u64 {
-        var written = api::write(self.handle, data.ptr, data.size);
+        var written = sys::write(self.handle, data.ptr, data.size);
         if (written < 0) return Option:[u64]::none();
 
         return written as u64;
@@ -81,8 +81,8 @@ impl Fd : Writer {
 
 pub func stat(path: *u8) ?FileInfo {
     // Call native API
-    var stat: api::Stat;
-    var result = api::fstatat(api::at_fdcwd(), path, &stat, 0);
+    var stat: sys::Stat;
+    var result = sys::fstatat(sys::at_fdcwd(), path, &stat, 0);
 
     if (result == -1) return Option:[FileInfo]::none();
 

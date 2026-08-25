@@ -2,10 +2,10 @@
 
 mod std::os::windows;
 
-import std::os::windows::api;
+import std::sys;
 
 pub func get_cwd(buffer: mut []u8) ?u64 {
-    var result = api::GetCurrentDirectoryA(buffer.size as u32, buffer.ptr);
+    var result = sys::GetCurrentDirectoryA(buffer.size as u32, buffer.ptr);
     if (result >= buffer.size) return Option:[u64]::none();
 
     return result;

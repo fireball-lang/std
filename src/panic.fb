@@ -1,9 +1,9 @@
 mod std;
 
 import std::backtrace::{State, Code, create_state, full};
-import std::c::{from_cstring, exit};
+import std::os::{stderr, exit};
+import std::c::{from_cstring};
 import std::fmt::{Formatter};
-import std::os::{stderr};
 
 #[init]
 func init_panic() {

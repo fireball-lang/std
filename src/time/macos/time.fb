@@ -3,32 +3,22 @@
 mod std::time::macos;
 
 import std::time::{Duration};
-
-struct MachTimebaseInfo {
-    numer: u32,
-    denom: u32,
-}
-
-#[extern]
-func mach_continuous_time() u64;
-
-#[extern]
-func mach_timebase_info(info: mut* MachTimebaseInfo) i32;
+import std::sys;
 
 var MACH_TIMEBASE_NUMER: u64;
 var MACH_TIMEBASE_DENOM: u64;
 
 #[init]
 func init_constants() {
-    var info = MachTimebaseInfo { numer: 0u, denom: 0u };
-    mach_timebase_info(&info);
+    var info = sys::MachTimebaseInfo { numer: 0u, denom: 0u };
+    sys::mach_timebase_info(&info);
 
     MACH_TIMEBASE_NUMER = info.numer as u64;
     MACH_TIMEBASE_DENOM = info.denom as u64;
 }
 
 pub func now() u64 {
-    return mach_continuous_time();
+    return sys::mach_continuous_time();
 }
 
 pub func duration_since(earlier: u64, latter: u64) Duration {

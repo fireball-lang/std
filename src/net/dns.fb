@@ -1,9 +1,11 @@
 mod std::net;
 
 #[cfg(target_family = "windows")]
-import std::net::windows::{DnsEntry, Domain, Type, getaddrinfo, freeaddrinfo};
+import std::net::windows::{getaddrinfo};
 #[cfg(target_family = "unix")]
-import std::net::unix::{DnsEntry, Domain, Type, getaddrinfo, freeaddrinfo};
+import std::net::unix::{getaddrinfo};
+
+import std::sys::{DnsEntry, Domain, Type, freeaddrinfo};
 
 import std::c::{to_cstring, free, printf};
 

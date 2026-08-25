@@ -2,46 +2,14 @@
 
 mod std::net::unix;
 
-import std::net::unix::{SocketAddress, Domain, SocketFd, recv, send};
+import std::net::unix::{SocketFd};
 import std::c::{errno};
+import std::sys;
 
-// Secure Transport
-
-struct SslCtx {}
-
-#[extern]
-func SSLCreateContext(alloc: *void, protocolSide: i32, connectionType: i32) *SslCtx;
-
-#[extern]
-func SSLSetIOFuncs(ctx: *SslCtx, read_func: func(*void, mut* void, mut* u64) i32, write_func: func(*void, *void, mut* u64) i32) i32;
-
-#[extern]
-func SSLSetConnection(ctx: *SslCtx, connection: *void) i32;
-
-#[extern]
-func SSLSetPeerDomainName(ctx: *SslCtx, peerName: *void, peerNameLen: u64) i32;
-
-#[extern]
-func SSLHandshake(ctx: *SslCtx) i32;
-
-#[extern]
-func SSLRead(ctx: *SslCtx, data: mut* void, dataLen: u64, processed: mut* u64) i32;
-
-#[extern]
-func SSLWrite(ctx: *SslCtx, data: *void, dataLen: u64, processed: mut* u64) i32;
-
-#[extern]
-func SSLClose(ctx: *SslCtx) i32;
-
-#[extern]
-func CFRelease(cf: *void);
-
-// TlsSocket
-
-func ssl_read_cb(connection: *void, data: mut* void, data_length: mut* u64) i32 {
+func ssl_read_cb(connection: *void, data: mut *void, data_length: mut *u64) i32 {
     var fd = connection as u64 as i32;
     var to_read = *data_length;
-    var result = recv(fd, data, to_read, 0);
+    var result = sys::recv(fd, data, to_read, 0);
 
     if (result > 0) {
         *data_length = result as u64;
@@ -63,10 +31,10 @@ func ssl_read_cb(connection: *void, data: mut* void, data_length: mut* u64) i32 
     return -9800; // errSSLProtocol (Fatal Error)
 }
 
-func ssl_write_cb(connection: *void, data: *void, data_length: mut* u64) i32 {
+func ssl_write_cb(connection: *void, data: *void, data_length: mut *u64) i32 {
     var fd = connection as u64 as i32;
     var to_write = *data_length;
-    var result = send(fd, data, to_write, 0);
+    var result = sys::send(fd, data, to_write, 0);
 
     if (result > 0) {
         *data_length = result as u64;
@@ -86,40 +54,40 @@ func ssl_write_cb(connection: *void, data: *void, data_length: mut* u64) i32 {
 
 pub struct TlsSocket {
     fd: SocketFd,
-    ctx: *SslCtx,
+    ctx: *sys::SslCtx,
 }
 
 impl TlsSocket {
     pub func connect(ip: [4]u8, port: u16, hostname: StringView) ?Self {
-        var address = SocketAddress::new(Domain::IP4, ip, port);
+        var address = sys::SocketAddress::new(sys::Domain::IP4, ip, port);
         var fd = SocketFd::connect(address)?;
 
         // 1 = kSSLClientSide, 0 = kSSLStreamType
-        var ctx = SSLCreateContext(null, 1, 0);
+        var ctx = sys::SSLCreateContext(null, 1, 0);
         if (ctx == null) {
             fd.close();
             return Option:[Self]::none();
         }
 
         // Attach custom IO wrappers mapping OS socket Read/Write to Secure Transport
-        if (SSLSetIOFuncs(ctx, ssl_read_cb, ssl_write_cb) != 0) {
-            CFRelease(ctx as *void);
+        if (sys::SSLSetIOFuncs(ctx, ssl_read_cb, ssl_write_cb) != 0) {
+            sys::CFRelease(ctx as *void);
             fd.close();
             return Option:[Self]::none();
         }
 
         // Pass fd file descriptor inside an opaque pointer context to read/write callbacks
-        if (SSLSetConnection(ctx, fd.fd as u64 as *void) != 0) {
-            CFRelease(ctx as *void);
+        if (sys::SSLSetConnection(ctx, fd.fd as u64 as *void) != 0) {
+            sys::CFRelease(ctx as *void);
             fd.close();
             return Option:[Self]::none();
         }
 
         // Apply hostname for SNI (Server Name Indication) and domain validation
-        SSLSetPeerDomainName(ctx, hostname.ptr, hostname.size);
+        sys::SSLSetPeerDomainName(ctx, hostname.ptr, hostname.size);
 
-        if (SSLHandshake(ctx) != 0) {
-            CFRelease(ctx as *void);
+        if (sys::SSLHandshake(ctx) != 0) {
+            sys::CFRelease(ctx as *void);
             fd.close();
             return Option:[Self]::none();
         }
@@ -138,7 +106,7 @@ impl TlsSocket {
         if (data.size > 2_147_483_647u) data = data.slice(0u, 2_147_483_647u);
 
         var processed: u64 = 0u;
-        var result = SSLWrite(self.ctx, data.ptr, data.size, &processed);
+        var result = sys::SSLWrite(self.ctx, data.ptr, data.size, &processed);
 
         if (result != 0 && processed == 0u) return Option:[u64]::none();
 
@@ -149,7 +117,7 @@ impl TlsSocket {
         if (buffer.size > 2_147_483_647u) buffer = buffer.slice(0u, 2_147_483_647u);
 
         var processed: u64 = 0u;
-        var result = SSLRead(self.ctx, buffer.ptr, buffer.size, &processed);
+        var result = sys::SSLRead(self.ctx, buffer.ptr, buffer.size, &processed);
 
         if (result == -9802) {
             // errSSLClosedGraceful (0 bytes returned by network read usually)
@@ -163,8 +131,8 @@ impl TlsSocket {
 
     pub func close(mut self) {
         if (self.ctx != null) {
-            SSLClose(self.ctx);
-            CFRelease(self.ctx as *void);
+            sys::SSLClose(self.ctx);
+            sys::CFRelease(self.ctx as *void);
             self.ctx = null;
         }
 

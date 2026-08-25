@@ -3,9 +3,11 @@ mod std::net;
 import std::io::{Reader, Writer};
 
 #[cfg(target_family = "windows")]
-import std::net::windows::{SocketFd, SocketAddress, Domain, Type, Protocol};
+import std::net::windows::{SocketFd};
 #[cfg(target_family = "unix")]
-import std::net::unix::{SocketFd, SocketAddress, Domain, Type, Protocol};
+import std::net::unix::{SocketFd};
+
+import std::sys::{SocketAddress, Domain, Type, Protocol};
 
 pub struct Socket {
     pub ip: [4]u8,

@@ -2,9 +2,10 @@
 
 mod std::net::unix;
 
-import std::net::unix::{SocketAddress, Domain, SocketFd};
+import std::net::unix::{SocketFd};
 import std::c::{to_cstring, free};
 import std::os::{Library};
+import std::sys;
 
 // OpenSSL
 
@@ -73,7 +74,7 @@ impl TlsSocket {
     pub func connect(ip: [4]u8, port: u16, hostname: StringView) ?Self {
         ensure_openssl_loaded();
 
-        var address = SocketAddress::new(Domain::IP4, ip, port);
+        var address = sys::SocketAddress::new(sys::Domain::IP4, ip, port);
         var fd = SocketFd::connect(address)?;
 
         var ctx = SSL_CTX_new(TLS_client_method());

@@ -2,87 +2,24 @@
 
 mod std::net::unix;
 
-// Bindings
-
-pub enum Domain : i32 {
-    IP4 = 2,
-    IP6 = 10,
-}
-
-pub enum Type : i32 {
-    TCP = 1,
-    UDP = 2,
-}
-
-pub enum Protocol : i32 {
-    IP = 0,
-}
-
-#[repr(C)]
-pub struct SocketAddress {
-    pub domain: u16,
-    port: u16,
-    pub ip: [4]u8,
-
-    _pad: [8]u8,
-}
-
-impl SocketAddress {
-    pub func new(domain: Domain, ip: [4]u8, port: u16) Self {
-        return Self {
-            domain: domain as u16,
-            port: ((port >> 8u) & 0xFF) | ((port & 0xFF) << 8u),
-            ip: ip,
-        };
-    }
-
-    pub func port(self) u16 {
-        return ((self.port >> 8u) & 0xFF) | ((self.port & 0xFF) << 8u);
-    }
-}
-
-#[extern]
-func socket(domain: Domain, type_: Type, protocol: Protocol) i32;
-
-#[extern]
-func bind(fd: i32, addr: *SocketAddress, len: u32) i32;
-
-#[extern]
-func connect(fd: i32, addr: *SocketAddress, len: u32) i32;
-
-#[extern]
-func listen(fd: i32, backlog: i32) i32;
-
-#[extern]
-func accept(fd: i32, addr: mut* SocketAddress, len: mut* u32) i32;
-
-#[extern]
-func send(fd: i32, buf: *void, len: u64, flags: i32) i64;
-
-#[extern]
-func recv(fd: i32, buf: mut* void, len: u64, flags: i32) i64;
-
-#[extern]
-func close(fd: i32) i32;
-
-// SocketFd
+import std::sys;
 
 pub struct SocketFd {
     fd: i32,
 }
 
 impl SocketFd {
-    pub func new(domain: Domain, type_: Type, protocol: Protocol) ?Self {
-        var fd = socket(domain, type_, protocol);
+    pub func new(domain: sys::Domain, type_: sys::Type, protocol: sys::Protocol) ?Self {
+        var fd = sys::socket(domain, type_, protocol);
         if (fd < 0) return Option:[Self]::none();
 
         return Self { fd: fd };
     }
 
-    pub func connect(address: SocketAddress) ?Self {
-        var fd = Self::new(address.domain as Domain, Type::TCP, Protocol::IP)?;
+    pub func connect(address: sys::SocketAddress) ?Self {
+        var fd = Self::new(address.domain as sys::Domain, sys::Type::TCP, sys::Protocol::IP)?;
 
-        if (connect(fd.fd, &address, sizeof(SocketAddress)) < 0) {
+        if (sys::connect(fd.fd, &address, sizeof(sys::SocketAddress)) < 0) {
             fd.close();
             return Option:[Self]::none();
         }
@@ -90,14 +27,14 @@ impl SocketFd {
         return fd;
     }
 
-    pub func listen(address: SocketAddress) ?Self {
-        var fd = Self::new(address.domain as Domain, Type::TCP, Protocol::IP)?;
+    pub func listen(address: sys::SocketAddress) ?Self {
+        var fd = Self::new(address.domain as sys::Domain, sys::Type::TCP, sys::Protocol::IP)?;
 
-        if (bind(fd.fd, &address, sizeof(SocketAddress)) < 0) {
+        if (sys::bind(fd.fd, &address, sizeof(sys::SocketAddress)) < 0) {
             fd.close();
             return Option:[Self]::none();
         }
-        else if (listen(fd.fd, 64) < 0) {
+        else if (sys::listen(fd.fd, 64) < 0) {
             fd.close();
             return Option:[Self]::none();
         }
@@ -109,8 +46,8 @@ impl SocketFd {
         return self.fd >= 0;
     }
 
-    pub func accept(self, address: mut* SocketAddress, address_len: mut* u32) ?Self {
-        var fd = accept(self.fd, address, address_len);
+    pub func accept(self, address: mut *sys::SocketAddress, address_len: mut *u32) ?Self {
+        var fd = sys::accept(self.fd, address, address_len);
         if (fd < 0) return Option:[Self]::none();
 
         return Self { fd: fd };
@@ -119,7 +56,7 @@ impl SocketFd {
     pub func send(mut self, data: []u8) ?u64 {
         // Send
         if (data.size == 0u) return 0u;
-        var sent = send(self.fd, data.ptr, data.size, 0);
+        var sent = sys::send(self.fd, data.ptr, data.size, 0);
 
         // Some amount of bytes sent
         if (sent > 0) {
@@ -133,7 +70,7 @@ impl SocketFd {
     pub func receive(mut self, buffer: mut []u8) ?u64 {
         // Receive
         if (buffer.size == 0u) return 0u;
-        var read = recv(self.fd, buffer.ptr, buffer.size, 0);
+        var read = sys::recv(self.fd, buffer.ptr, buffer.size, 0);
 
         // Some amount of bytes read
         if (read > 0) {
@@ -151,7 +88,7 @@ impl SocketFd {
 
     pub func close(mut self) {
         if (self.is_open()) {
-            close(self.fd);
+            sys::close(self.fd);
             self.fd = -1;
         }
     }

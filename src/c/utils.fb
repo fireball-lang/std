@@ -1,6 +1,6 @@
 mod std::c;
 
-import std::c::{malloc, memcpy};
+import std::c::{malloc};
 
 #[cfg(target_os = "windows")]
 #[extern, link_name("_errno")]
