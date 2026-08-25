@@ -1,0 +1,50 @@
+mod std::backtrace;
+
+#[repr(C)]
+pub struct State {}
+
+pub enum Code : i32 {
+    Continue = 0,
+    Break = 1,
+}
+
+#[extern, link_name("backtrace_create_state")]
+pub func create_state(
+    filename: *u8,
+    flags: i32,
+    error_cb: func(data: *void, msg: *u8, err: i32) void,
+    data: *void,
+) *State;
+
+#[extern, link_name("backtrace_full")]
+pub func full(
+    state: *State,
+    skip: i32,
+    full_cb: func(data: *void, pc: u64, filename: *u8, line: i32, function: *u8) Code,
+    error_cb: func(data: *void, msg: *u8, err: i32) void,
+    data: *void,
+) i32;
+
+#[extern, link_name("backtrace_simple")]
+pub func simple(
+    state: *State,
+    simple_cb: func(data: *void, pc: u64) Code,
+) i32;
+
+#[extern, link_name("backtrace_pcinfo")]
+pub func pc_info(
+    state: *State,
+    pc: u64,
+    full_cb: func(data: *void, pc: u64, filename: *u8, line: i32, function: *u8) Code,
+    error_cb: func(data: *void, msg: *u8, err: i32) void,
+    data: *void,
+);
+
+#[extern, link_name("backtrace_syminfo")]
+pub func sym_info(
+    state: *State,
+    addr: u64,
+    sym_cb: func(data: *void, pc: u64, symname: *u8, symval: u64, symsize: u64) void,
+    error_cb: func(data: *void, msg: *u8, err: i32) void,
+    data: *void,
+);

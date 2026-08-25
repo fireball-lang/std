@@ -2,3 +2,12 @@ name = "std"
 type = "library"
 
 lib-c = true
+
+lib-paths = [ "libs/%(OS)-%(ARCH)" ]
+libs = [ "backtrace" ]
+
+[profile.debug]
+output-ir = true
+
+[profile.release]
+output-ir = true

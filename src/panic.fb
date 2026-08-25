@@ -1,21 +1,9 @@
 mod std;
 
+import std::backtrace::{State, Code, create_state, full};
+import std::c::{from_cstring, exit};
 import std::fmt::{Formatter};
 import std::os::{stderr};
-import std::c::{exit};
-
-#[repr(C)]
-struct UnwindCtx {}
-
-enum UnwindCode : i32 {
-    NoReason = 0,
-}
-
-#[extern]
-func _Unwind_Backtrace(cb: func(ctx: *UnwindCtx, arg: *void) UnwindCode, arg: *void) UnwindCode;
-
-#[extern]
-func _Unwind_GetIP(ctx: *UnwindCtx) u64;
 
 #[init]
 func init_panic() {
@@ -30,24 +18,59 @@ func panic_handler(msg: StringView) {
     w.write("\n");
 
     var frame: u32;
-    _Unwind_Backtrace(backtrace_callback, &frame);
+
+    var state = create_state(null, 0, error_callback, null);
+    full(state, 0, backtrace_callback, error_callback, &frame);
 
     exit(1);
 }
 
-func backtrace_callback(ctx: *UnwindCtx, arg: *void) UnwindCode {
+func error_callback(_data: *void, msg: *u8, err: i32) {
     var fmt = Formatter::new(stderr());
-    var frame = arg as mut *u32;
+
+    fmt.i64(err);
+    fmt.str(": ");
+    fmt.str(from_cstring(msg));
+    fmt.str("\n");
+}
+
+func backtrace_callback(data: *void, pc: u64, filename_cstr: *u8, line: i32, function_cstr: *u8) Code {
+    var fmt = Formatter::new(stderr());
+
+    var frame_ptr = data as mut *u32;
+    var frame = *frame_ptr;
+    (*frame_ptr)++;
+
+    var function = "";
+    if (function_cstr != null) function = from_cstring(function_cstr);
+    if (function == "fb$std$panic_handler" || function == "fb$core$panic") return Code::Continue;
+    if (function.starts_with("fb$")) function = function.slice(3, function.size);
 
     fmt.str("  [");
-    fmt.u64(*frame);
+    if (frame < 10) fmt.str(" ");
+    fmt.u64(frame);
     fmt.str("] ");
-    write_hex(fmt, _Unwind_GetIP(ctx));
+    write_hex(fmt, pc);
+
+    if (function_cstr != null) {
+        fmt.str(" - ");
+        fmt.str(function);
+
+        if (filename_cstr != null) {
+            fmt.str("\n      at ");
+            fmt.str(from_cstring(filename_cstr));
+        }
+
+        fmt.str(":");
+        fmt.i64(line);
+    }
+    else {
+        fmt.str(" - <unknown function>");
+    }
+
     fmt.str("\n");
 
-    (*frame)++;
-
-    return UnwindCode::NoReason;
+    return Code::Continue;
 }
 
 func write_hex(fmt: Formatter, val: u64) {
@@ -77,7 +100,7 @@ func write_hex(fmt: Formatter, val: u64) {
         }
 
         // Shift right by 4 bits to process the next hex digit
-        temp = temp >> 4;
+        temp = temp >>> 4;
     }
 
     fmt.str(StringView { ptr: &buf[i], size: 16 - i });
