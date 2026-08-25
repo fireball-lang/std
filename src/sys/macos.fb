@@ -9,6 +9,7 @@ pub enum FileFlags : i32 {
     WriteOnly = 1,
     Create = 512,
     Truncate = 1024,
+    Directory = 1048576,
     CloseOnExec = 16777216,
 }
 
@@ -56,13 +57,21 @@ pub enum Protocol : i32 {
 // Structs
 
 #[repr(C)]
-pub struct Dirent {
+pub struct Dirent64 {
     pub ino: u64,
-    pub off: u64,
+    pub off: i64,
     pub reclen: u16,
-    pub namlen: u16,
+    pub namelen: u16,
     pub type_: u8,
-    pub name: [1024]u8,
+}
+
+impl Dirent64 {
+    pub func name(self) StringView {
+        return StringView {
+            ptr: &(self as *u8)[offsetof(Dirent64, type_) + 1],
+            size: self.namelen,
+        };
+    }
 }
 
 #[repr(C)]
@@ -152,19 +161,13 @@ pub func mkdir(path: *u8, mode: u32) i32;
 pub func rmdir(path: *u8) i32;
 
 #[extern]
-pub func opendir(path: *u8) *void;
-
-#[extern]
-pub func readdir(dir: *void) *Dirent;
-
-#[extern]
-pub func closedir(dir: *void) i32;
-
-#[extern]
 pub func openat(fd: i32, path: *u8, flags: FileFlags, mode: i32) i32;
 
 #[extern]
 pub func close(fd: i32) i32;
+
+#[extern]
+pub func getdirentries(fd: i32, buffer: mut *void, size: i32, base: mut *i64) i32;
 
 #[extern]
 pub func lseek(fd: i32, offset: i64, whence: i32) i64;

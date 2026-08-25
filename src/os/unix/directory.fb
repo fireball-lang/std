@@ -2,7 +2,7 @@
 
 mod std::os::unix;
 
-import std::c::{to_cstring, from_cstring, malloc, free};
+import std::c::{to_cstring, malloc, free};
 import std::os::{FileKind, FileInfo};
 import std::os::unix::{stat};
 import std::sys;
@@ -43,16 +43,33 @@ impl DirEntryInfo {
     }
 }
 
+#[cfg(target_os = "linux")]
 pub struct DirIterator {
     path: StringView,
-    dir: *void,
+    dir: i32,
+
+    buffer: mut *u8,
+    index: u32,
+    size: u32,
+}
+
+#[cfg(target_os = "macos")]
+pub struct DirIterator {
+    path: StringView,
+    dir: i32,
+
+    buffer: mut *u8,
+    index: u32,
+    size: u32,
+
+    base: i64,
 }
 
 pub func list_dir(path: StringView) ?DirIterator {
     var c_path = to_cstring(path);
-    var dir = sys::opendir(c_path);
+    var dir = sys::openat(sys::at_fdcwd(), c_path, sys::FileFlags::ReadOnly | sys::FileFlags::Directory, 0);
 
-    if (dir == null) {
+    if (dir < 0) {
         free(c_path);
         return Option:[DirIterator]::none();
     }
@@ -60,33 +77,39 @@ pub func list_dir(path: StringView) ?DirIterator {
     return DirIterator {
         path: StringView { ptr: c_path, size: path.size },
         dir: dir,
+        buffer: malloc(1024) as mut *u8,
     };
 }
 
 impl DirIterator {
     pub func next(mut self, kind: mut &FileKind, info: mut &DirEntryInfo) StringView {
-        if (self.dir == null) return "";
+        if (self.dir < 0) return "";
 
         for (;;) {
-            var dirent = sys::readdir(self.dir);
+            // Read more entries if necessary
+            if (self.index >= self.size) {
+                if (!read(self)) {
+                    // EOF
+                    free(self.path.ptr);
+                    sys::close(self.dir);
+                    free(self.buffer);
 
-            // EOF
-            if (dirent == null) {
-                free(self.path.ptr);
-                sys::closedir(self.dir);
-
-                self.dir = null;
-                return "";
+                    self.dir = -1;
+                    return "";
+                }
             }
 
+            var entry = &self.buffer[self.index] as *sys::Dirent64;
+            self.index += entry.reclen;
+
             // Skip over '.' and '..'
-            var name = from_cstring(&dirent.name[0]);
+            var name = entry.name();
             if (name == "." || name == "..") continue;
 
             // Get FileKind with fallback to `stat()`
             info.empty = true;
 
-            if (dirent.type_ == 0) {
+            if (entry.type_ == 0) {
                 var info_opt = self.stat(name);
 
                 if (info_opt.is_some()) {
@@ -96,13 +119,13 @@ impl DirIterator {
                     *kind = info.info.kind;
                 }
             }
-            else if (dirent.type_ == 8) {
+            else if (entry.type_ == 8) {
                 *kind = FileKind::File;
             }
-            else if (dirent.type_ == 4) {
+            else if (entry.type_ == 4) {
                 *kind = FileKind::Directory;
             }
-            else if (dirent.type_ == 10) {
+            else if (entry.type_ == 10) {
                 *kind = FileKind::Symlink;
             }
             else {
@@ -133,4 +156,26 @@ impl DirIterator {
 
         return result;
     }
+}
+
+#[cfg(target_os = "linux")]
+func read(self: mut *DirIterator) bool {
+    var result = sys::getdents64(self.dir, self.buffer, 1024);
+    if (result <= 0) return false;
+
+    self.index = 0;
+    self.size = result as u32;
+
+    return true;
+}
+
+#[cfg(target_os = "macos")]
+func read(self: mut *DirIterator) bool {
+    var result = sys::getdirentries(self.dir, self.buffer, 4096, &self.base);
+    if (result <= 0) return false;
+
+    self.index = 0;
+    self.size = result as u32;
+
+    return true;
 }

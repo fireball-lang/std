@@ -2,6 +2,8 @@
 
 mod std::sys;
 
+import std::c::{from_cstring};
+
 // Enums
 
 pub enum FileFlags : i32 {
@@ -9,6 +11,7 @@ pub enum FileFlags : i32 {
     WriteOnly = 1,
     Create = 64,
     Truncate = 512,
+    Directory = 65536,
     CloseOnExec = 524288,
 }
 
@@ -56,12 +59,17 @@ pub enum Protocol : i32 {
 // Structs
 
 #[repr(C)]
-pub struct Dirent {
+pub struct Dirent64 {
     pub ino: u64,
     pub off: i64,
     pub reclen: u16,
     pub type_: u8,
-    pub name: [256]u8,
+}
+
+impl Dirent64 {
+    pub func name(self) StringView {
+        return from_cstring(&(self as *u8)[offsetof(Dirent64, type_) + 1]);
+    }
 }
 
 #[repr(C)]
@@ -145,21 +153,16 @@ pub func rmdir(path: *u8) i32 {
     return syscall1i(84, path as u64) as i32;
 }
 
-#[extern]
-pub func opendir(path: *u8) *void;
-
-#[extern]
-pub func readdir(dir: *void) *Dirent;
-
-#[extern]
-pub func closedir(dir: *void) i32;
-
 pub func openat(fd: i32, path: *u8, flags: FileFlags, mode: i32) i32 {
     return syscall4i(257, u64(fd), path as u64, flags as u64, u64(mode)) as i32;
 }
 
 pub func close(fd: i32) i32 {
     return syscall1i(3, u64(fd)) as i32;
+}
+
+pub func getdents64(fd: i32, buffer: mut *void, size: u32) i32 {
+    return syscall3i(217, u64(fd), buffer as u64, size) as i32;
 }
 
 pub func lseek(fd: i32, offset: i64, whence: i32) i64 {
