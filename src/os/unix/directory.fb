@@ -51,17 +51,8 @@ pub struct DirIterator {
     buffer: mut *u8,
     index: u32,
     size: u32,
-}
 
-#[cfg(target_os = "macos")]
-pub struct DirIterator {
-    path: StringView,
-    dir: i32,
-
-    buffer: mut *u8,
-    index: u32,
-    size: u32,
-
+    #[cfg(target_os = "macos")]
     base: i64,
 }
 
@@ -88,7 +79,7 @@ impl DirIterator {
         for (;;) {
             // Read more entries if necessary
             if (self.index >= self.size) {
-                if (!read(self)) {
+                if (!self.read()) {
                     // EOF
                     free(self.path.ptr);
                     sys::close(self.dir);
@@ -156,26 +147,27 @@ impl DirIterator {
 
         return result;
     }
-}
 
-#[cfg(target_os = "linux")]
-func read(self: mut *DirIterator) bool {
-    var result = sys::getdents64(self.dir, self.buffer, 1024);
-    if (result <= 0) return false;
 
-    self.index = 0;
-    self.size = result as u32;
+    #[cfg(target_os = "linux")]
+    func read(mut self) bool {
+        var result = sys::getdents64(self.dir, self.buffer, 1024);
+        if (result <= 0) return false;
 
-    return true;
-}
+        self.index = 0;
+        self.size = result as u32;
 
-#[cfg(target_os = "macos")]
-func read(self: mut *DirIterator) bool {
-    var result = sys::getdirentries(self.dir, self.buffer, 4096, &self.base);
-    if (result <= 0) return false;
+        return true;
+    }
 
-    self.index = 0;
-    self.size = result as u32;
+    #[cfg(target_os = "macos")]
+    func read(mut self) bool {
+        var result = sys::getdirentries(self.dir, self.buffer, 4096, &self.base);
+        if (result <= 0) return false;
 
-    return true;
+        self.index = 0;
+        self.size = result as u32;
+
+        return true;
+    }
 }
