@@ -134,18 +134,18 @@ impl Serializer {
         // implements Serialize
         var vtable = info.get_vtable(typeof(Serialize));
 
-        if (vtable != null) {
+        if (vtable.is_some()) {
             if (ptr == null) {
                 self.null_();
                 return;
             }
 
-            var value: Serialize;
+            var value = Interface {
+                data: ptr as mut &void,
+                vtable: vtable.unwrap(),
+            };
 
-            (&value as mut *Interface).data = ptr as mut *void;
-            (&value as mut *Interface).vtable = vtable;
-
-            value.serialize(self);
+            (*(&value as *Serialize)).serialize(self);
             return;
         }
 

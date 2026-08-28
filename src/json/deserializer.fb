@@ -276,18 +276,18 @@ impl Deserializer {
         // implements Serialize
         var vtable = info.get_vtable(typeof(Deserialize));
 
-        if (vtable != null) {
+        if (vtable.is_some()) {
             if (self.peek()?.kind == TokenKind::Null) {
                 self.next();
                 return true;
             }
 
-            var value: mut Deserialize;
+            var value = Interface {
+                data: ptr as mut &void,
+                vtable: vtable.unwrap(),
+            };
 
-            (&value as mut *Interface).data = ptr;
-            (&value as mut *Interface).vtable = vtable;
-
-            return value.deserialize(self);
+            return (*(&value as *mut Deserialize)).deserialize(self);
         }
 
         // Enum
