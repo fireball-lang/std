@@ -43,7 +43,6 @@ impl DirEntryInfo {
     }
 }
 
-#[cfg(target_os = "linux")]
 pub struct DirIterator {
     path: StringView,
     dir: i32,

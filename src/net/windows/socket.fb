@@ -2,7 +2,7 @@
 
 mod std::net::windows;
 
-import std::c::{printf, exit};
+import std::c::{printf};
 import std::sys;
 
 var wsa_initialized: bool;

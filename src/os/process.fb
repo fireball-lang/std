@@ -146,7 +146,7 @@ impl Process {
 /// Exits the current process with the specified exit code.
 #[cfg(target_family = "windows")]
 pub func exit(code: u8) {
-    sys::exit(code);
+    sys::ExitProcess(code);
 }
 
 /// Exits the current process with the specified exit code.
