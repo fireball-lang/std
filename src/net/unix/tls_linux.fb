@@ -14,24 +14,31 @@ struct SslCtx {}
 struct Ssl {}
 struct X509_VERIFY_PARAM {}
 
-var TLS_client_method: func() *Method;
-var SSL_CTX_new: func(*Method) *SslCtx;
-var SSL_CTX_free: func(*SslCtx);
-var SSL_CTX_set_default_verify_paths: func(*SslCtx) i32;
-var SSL_CTX_set_verify: func(*SslCtx, i32, *void);
-var SSL_new: func(*SslCtx) *Ssl;
-var SSL_free: func(*Ssl);
-var SSL_set_fd: func(*Ssl, i32) i32;
-var SSL_get0_param: func(*Ssl) *X509_VERIFY_PARAM;
-var X509_VERIFY_PARAM_set1_host: func(*X509_VERIFY_PARAM, *u8, u64) i32;
-var SSL_ctrl: func(*Ssl, i32, i64, *void) i64;
-var SSL_connect: func(*Ssl) i32;
-var SSL_read: func(*Ssl, mut* void, i32) i32;
-var SSL_write: func(*Ssl, *void, i32) i32;
-var SSL_shutdown: func(*Ssl) i32;
+struct OpenSSL {
+    client_method: func() *Method,
+    ctx_new: func(*Method) *SslCtx,
+    ctx_free: func(*SslCtx),
+    ctx_set_default_verify_paths: func(*SslCtx) i32,
+    ctx_set_verify: func(*SslCtx, i32, *void),
+    ssl_new: func(*SslCtx) *Ssl,
+    ssl_free: func(*Ssl),
+    ssl_set_fd: func(*Ssl, i32) i32,
+    ssl_get0_param: func(*Ssl) *X509_VERIFY_PARAM,
+    x509_verify_param_set1_host: func(*X509_VERIFY_PARAM, *u8, u64) i32,
+    ssl_ctrl: func(*Ssl, i32, i64, *void) i64,
+    ssl_connect: func(*Ssl) i32,
+    ssl_read: func(*Ssl, mut* void, i32) i32,
+    ssl_write: func(*Ssl, *void, i32) i32,
+    ssl_shutdown: func(*Ssl) i32,
+}
+
+impl OpenSSL : Zeroable {}
+
+var openssl: OpenSSL;
+var openssl_loaded: bool;
 
 func ensure_openssl_loaded() {
-    if (TLS_client_method != null) return;
+    if (openssl_loaded) return;
 
     // Load library
     var names = [3]StringView { "libssl.so", "libssl.so.3", "libssl.so.1.1" };
@@ -44,21 +51,25 @@ func ensure_openssl_loaded() {
     // Get functions
     var lib = lib_opt.expect("failed to open OpenSSL");
 
-    TLS_client_method = lib.get("TLS_client_method").expect("failed to get 'TLS_client_method' from OpenSSL") as func() *Method;
-    SSL_CTX_new = lib.get("SSL_CTX_new").expect("failed to get 'SSL_CTX_new' from OpenSSL") as func(*Method) *SslCtx;
-    SSL_CTX_free = lib.get("SSL_CTX_free").expect("failed to get 'SSL_CTX_free' from OpenSSL") as func(*SslCtx);
-    SSL_CTX_set_default_verify_paths = lib.get("SSL_CTX_set_default_verify_paths").expect("failed to get 'SSL_CTX_set_default_verify_paths' from OpenSSL") as func(*SslCtx) i32;
-    SSL_CTX_set_verify = lib.get("SSL_CTX_set_verify").expect("failed to get 'SSL_CTX_set_verify' from OpenSSL") as func(*SslCtx, i32, *void);
-    SSL_new = lib.get("SSL_new").expect("failed to get 'SSL_new' from OpenSSL") as func(*SslCtx) *Ssl;
-    SSL_free = lib.get("SSL_free").expect("failed to get 'SSL_free' from OpenSSL") as func(*Ssl);
-    SSL_set_fd = lib.get("SSL_set_fd").expect("failed to get 'SSL_set_fd' from OpenSSL") as func(*Ssl, i32) i32;
-    SSL_get0_param = lib.get("SSL_get0_param").expect("failed to get 'SSL_get0_param' from OpenSSL") as func(*Ssl) *X509_VERIFY_PARAM;
-    X509_VERIFY_PARAM_set1_host = lib.get("X509_VERIFY_PARAM_set1_host").expect("failed to get 'X509_VERIFY_PARAM_set1_host' from OpenSSL") as func(*X509_VERIFY_PARAM, *u8, u64) i32;
-    SSL_ctrl = lib.get("SSL_ctrl").expect("failed to get 'SSL_ctrl'") as func(*Ssl, i32, i64, *void) i64;
-    SSL_connect = lib.get("SSL_connect").expect("failed to get 'SSL_connect' from OpenSSL") as func(*Ssl) i32;
-    SSL_read = lib.get("SSL_read").expect("failed to get 'SSL_read' from OpenSSL") as func(*Ssl, mut* void, i32) i32;
-    SSL_write = lib.get("SSL_write").expect("failed to get 'SSL_write' from OpenSSL") as func(*Ssl, *void, i32) i32;
-    SSL_shutdown = lib.get("SSL_shutdown").expect("failed to get 'SSL_shutdown' from OpenSSL") as func(*Ssl) i32;
+    openssl = OpenSSL {
+        client_method: lib.get("TLS_client_method").expect("failed to get 'TLS_client_method' from OpenSSL") as func() *Method,
+        ctx_new: lib.get("SSL_CTX_new").expect("failed to get 'SSL_CTX_new' from OpenSSL") as func(*Method) *SslCtx,
+        ctx_free: lib.get("SSL_CTX_free").expect("failed to get 'SSL_CTX_free' from OpenSSL") as func(*SslCtx),
+        ctx_set_default_verify_paths: lib.get("SSL_CTX_set_default_verify_paths").expect("failed to get 'SSL_CTX_set_default_verify_paths' from OpenSSL") as func(*SslCtx) i32,
+        ctx_set_verify: lib.get("SSL_CTX_set_verify").expect("failed to get 'SSL_CTX_set_verify' from OpenSSL") as func(*SslCtx, i32, *void),
+        ssl_new: lib.get("SSL_new").expect("failed to get 'SSL_new' from OpenSSL") as func(*SslCtx) *Ssl,
+        ssl_free: lib.get("SSL_free").expect("failed to get 'SSL_free' from OpenSSL") as func(*Ssl),
+        ssl_set_fd: lib.get("SSL_set_fd").expect("failed to get 'SSL_set_fd' from OpenSSL") as func(*Ssl, i32) i32,
+        ssl_get0_param: lib.get("SSL_get0_param").expect("failed to get 'SSL_get0_param' from OpenSSL") as func(*Ssl) *X509_VERIFY_PARAM,
+        x509_verify_param_set1_host: lib.get("X509_VERIFY_PARAM_set1_host").expect("failed to get 'X509_VERIFY_PARAM_set1_host' from OpenSSL") as func(*X509_VERIFY_PARAM, *u8, u64) i32,
+        ssl_ctrl: lib.get("SSL_ctrl").expect("failed to get 'SSL_ctrl'") as func(*Ssl, i32, i64, *void) i64,
+        ssl_connect: lib.get("SSL_connect").expect("failed to get 'SSL_connect' from OpenSSL") as func(*Ssl) i32,
+        ssl_read: lib.get("SSL_read").expect("failed to get 'SSL_read' from OpenSSL") as func(*Ssl, mut* void, i32) i32,
+        ssl_write: lib.get("SSL_write").expect("failed to get 'SSL_write' from OpenSSL") as func(*Ssl, *void, i32) i32,
+        ssl_shutdown: lib.get("SSL_shutdown").expect("failed to get 'SSL_shutdown' from OpenSSL") as func(*Ssl) i32,
+    };
+
+    openssl_loaded = true;
 }
 
 // TlsSocket
@@ -77,23 +88,23 @@ impl TlsSocket {
         var address = sys::SocketAddress::new(sys::Domain::IP4, ip, port);
         var fd = SocketFd::connect(address)?;
 
-        var ctx = SSL_CTX_new(TLS_client_method());
+        var ctx = openssl.ctx_new(openssl.client_method());
         if (ctx == null) {
             fd.close();
             return Option:[Self]::none();
         }
 
-        SSL_CTX_set_default_verify_paths(ctx);
-        SSL_CTX_set_verify(ctx, 1, null); // 1 - SSL_VERIFY_PEER
+        openssl.ctx_set_default_verify_paths(ctx);
+        openssl.ctx_set_verify(ctx, 1, null); // 1 - SSL_VERIFY_PEER
 
-        var ssl = SSL_new(ctx);
-        SSL_set_fd(ssl, fd.fd);
+        var ssl = openssl.ssl_new(ctx);
+        openssl.ssl_set_fd(ssl, fd.fd);
 
-        var param = SSL_get0_param(ssl);
-        X509_VERIFY_PARAM_set1_host(param, hostname.ptr, hostname.size);
+        var param = openssl.ssl_get0_param(ssl);
+        openssl.x509_verify_param_set1_host(param, hostname.ptr, hostname.size);
 
         var hostname_c = to_cstring(hostname);
-        SSL_ctrl(ssl, 55, 0, hostname_c);
+        openssl.ssl_ctrl(ssl, 55, 0, hostname_c);
         free(hostname_c);
 
         var socket = Self {
@@ -102,7 +113,7 @@ impl TlsSocket {
             ssl: ssl,
         };
 
-        if (SSL_connect(ssl) <= 0) {
+        if (openssl.ssl_connect(ssl) <= 0) {
             socket.close();
             return Option:[Self]::none();
         }
@@ -117,7 +128,7 @@ impl TlsSocket {
     pub func receive(mut self, buffer: mut []u8) ?u64 {
         if (buffer.size > 2_147_483_647u) buffer = buffer.slice(0u, 2_147_483_647u);
 
-        var result = SSL_read(self.ssl, buffer.ptr, buffer.size as i32);
+        var result = openssl.ssl_read(self.ssl, buffer.ptr, buffer.size as i32);
         if (result < 0) return Option:[u64]::none();
 
         return result as u64;
@@ -126,18 +137,18 @@ impl TlsSocket {
     pub func send(mut self, data: []u8) ?u64 {
         if (data.size > 2_147_483_647u) data = data.slice(0u, 2_147_483_647u);
 
-        var result = SSL_write(self.ssl, data.ptr, data.size as i32);
+        var result = openssl.ssl_write(self.ssl, data.ptr, data.size as i32);
         if (result < 0) return Option:[u64]::none();
 
         return result as u64;
     }
 
     pub func close(mut self) {
-        SSL_shutdown(self.ssl);
-        SSL_free(self.ssl);
+        openssl.ssl_shutdown(self.ssl);
+        openssl.ssl_free(self.ssl);
         self.ssl = null;
 
-        SSL_CTX_free(self.ctx);
+        openssl.ctx_free(self.ctx);
         self.ctx = null;
 
         self.fd.close();
