@@ -132,9 +132,9 @@ impl Style {
         w.write("\x1b[");
 
         // Foreground & Background
-        fmt.u64(self.fg.fg_code());
+        fmt.u64(self.fg.fg_code(), 10);
         w.write(";");
-        fmt.u64(self.bg.bg_code());
+        fmt.u64(self.bg.bg_code(), 10);
 
         // Attributes
         if ((self.attrs & Attribute::Bold) != Attribute::None) {

@@ -177,7 +177,7 @@ impl Deserializer {
             if (token.kind != TokenKind::Number) return Option:[bool]::none();
 
             if (kind.is_unsigned_integer()) {
-                var value = parse_u64(token.text, info.size * 8u)?;
+                var value = parse_u64(token.text, 10, info.size * 8u)?;
 
                 if (kind == PrimitiveKind::U8) *(ptr as mut* u8) = value as u8;
                 else if (kind == PrimitiveKind::U16) *(ptr as mut* u16) = value as u16;
@@ -188,7 +188,7 @@ impl Deserializer {
             }
 
             if (kind.is_signed_integer()) {
-                var value = parse_i64(token.text, info.size * 8u)?;
+                var value = parse_i64(token.text, 10, info.size * 8u)?;
 
                 if (kind == PrimitiveKind::I8) *(ptr as mut* i8) = value as i8;
                 else if (kind == PrimitiveKind::I16) *(ptr as mut* i16) = value as i16;

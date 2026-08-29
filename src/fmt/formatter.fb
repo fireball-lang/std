@@ -23,12 +23,12 @@ impl Formatter {
         self.writer.write(str);
     }
 
-    pub func u64(mut self, value: u64) {
-        format_u64(self.writer, value);
+    pub func u64(mut self, value: u64, base: u8) {
+        format_u64(self.writer, value, base);
     }
 
-    pub func i64(mut self, value: i64) {
-        format_i64(self.writer, value);
+    pub func i64(mut self, value: i64, base: u8) {
+        format_i64(self.writer, value, base);
     }
 
     pub func f64(mut self, value: f64) {

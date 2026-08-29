@@ -101,7 +101,7 @@ impl Client {
 
         // Send body
         socket.write("Content-Length: ");
-        format_u64(&socket, req.body.size);
+        format_u64(&socket, req.body.size, 10);
         socket.write("\r\n");
 
         socket.write("\r\n");

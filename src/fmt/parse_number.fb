@@ -1,16 +1,18 @@
 mod std::fmt;
 
 /// Parses a `StringView` as an unsigned integer.
-/// `bits` is the bit-width to check the range against (e.g. 32 or 64).
+/// - `base` is the radix (2 to 36).
+/// - `bits` is the bit-width to check the range against (e.g. 32 or 64).
+///
 /// Returns `None` if the value does not fit or the string is invalid.
-pub func parse_u64(str: StringView, bits: u32) ?u64 {
+pub func parse_u64(str: StringView, base: u8, bits: u32) ?u64 {
     // Validate
     if (str.size == 0 || bits == 0 || bits > 64) {
         return Option:[u64]::none();
     }
 
     // Parse value
-    var value = parse_u64_raw(str)?;
+    var value = parse_u64_raw(str, base)?;
 
     // Check range
     var max_val = 18446744073709551615u;
@@ -24,9 +26,11 @@ pub func parse_u64(str: StringView, bits: u32) ?u64 {
 }
 
 /// Parses a `StringView` as a signed integer, optionally prefixed with `-`.
-/// `bits` is the bit-width to check the range against (e.g. 32 or 64).
+/// - `base` is the radix (2 to 36).
+/// - `bits` is the bit-width to check the range against (e.g. 32 or 64).
+///
 /// Returns `None` if the value does not fit or the string is invalid.
-pub func parse_i64(str: StringView, bits: u32) ?i64 {
+pub func parse_i64(str: StringView, base: u8, bits: u32) ?i64 {
     // Validate
     if (str.size == 0 || bits == 0 || bits > 64) {
         return Option:[i64]::none();
@@ -45,7 +49,7 @@ pub func parse_i64(str: StringView, bits: u32) ?i64 {
     }
 
     // Parse value
-    var value = parse_u64_raw(str)?;
+    var value = parse_u64_raw(str, base)?;
 
     // Check range
     var max_val: i64 = 9223372036854775807;
@@ -213,23 +217,41 @@ pub func parse_f64(str: StringView) ?f64 {
     return result;
 }
 
-func parse_u64_raw(str: StringView) ?u64 {
+func parse_u64_raw(str: StringView, base: u8) ?u64 {
+    // Base must be between 2 and 36 (0-9 + A-Z)
+    if (base < 2 || base > 36) {
+        panic("invalid base, can only be between 2 and 36");
+    }
+
     var value: u64 = 0;
+    var b = base as u64;
 
     for (var i = 0u; i < str.size; i++) {
         var ch = str[i];
+        var digit: u64 = 0;
 
-        if (ch < '0' || ch > '9') {
+        // Convert character to digit value
+        if (ch >= '0' && ch <= '9') {
+            digit = (ch - '0') as u64;
+        } else if (ch >= 'A' && ch <= 'Z') {
+            digit = 10 + (ch - 'A') as u64;
+        } else if (ch >= 'a' && ch <= 'z') {
+            digit = 10 + (ch - 'a') as u64;
+        } else {
             return Option:[u64]::none();
         }
 
-        var digit = (ch - '0') as u64;
-
-        if (value > (18446744073709551615u - digit) / 10) {
+        // Ensure the digit is valid for the given base
+        if (digit >= b) {
             return Option:[u64]::none();
         }
 
-        value = (value * 10) + digit;
+        // Check for overflow before multiplying
+        if (value > (18446744073709551615u - digit) / b) {
+            return Option:[u64]::none();
+        }
+
+        value = (value * b) + digit;
     }
 
     return value;

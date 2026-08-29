@@ -47,14 +47,14 @@ impl Response {
 
         for (;;) {
             // Read data
-            var space = 8192u - res.filled;
-            if (space == 0u) {
+            var space = 8192 - res.filled;
+            if (space == 0) {
                 free(res.buffer.ptr);
                 return Option:[Self]::none();
             }
 
-            var size = socket.read(res.buffer.slice(res.filled, space)) or 0u;
-            if (size == 0u) {
+            var size = socket.read(res.buffer.slice(res.filled, space)) or 0;
+            if (size == 0) {
                 free(res.buffer.ptr);
                 return Option:[Self]::none();
             }
@@ -67,9 +67,9 @@ impl Response {
                 if (end < 0) break;
 
                 var line = StringView { ptr: &res.buffer.ptr[res.consumed], size: end as u32 };
-                res.consumed += end as u64 + 2u;
+                res.consumed += end as u64 + 2;
 
-                if (line.size == 0u) {
+                if (line.size == 0) {
                     res.determine_body_mode();
                     return res;
                 }
@@ -83,7 +83,14 @@ impl Response {
 
     func parse_line(mut self, line: StringView) {
         if (line.starts_with("HTTP/1.0 ") || line.starts_with("HTTP/1.1 ")) {
-            self.status = parse_u32(line.slice(9u, line.size)) as Status;
+            var str = line.slice(9u, line.size);
+            var i = 0u;
+
+            for (; i < line.size; i++) {
+                if (str[i] < '0' || str[i] > '9') break;
+            }
+
+            self.status = parse_u64(str.slice(0, i), 10, 32).unwrap() as Status;
         } else {
             self.parse_header(line);
         }
@@ -93,10 +100,10 @@ impl Response {
         var colon = line.index_of(":");
         if (colon < 0) return;
 
-        var key = line.slice(0u, colon as u32).trim();
-        if (key.size == 0u) return;
+        var key = line.slice(0, colon as u32).trim();
+        if (key.size == 0) return;
 
-        var value = line.slice(colon as u32 + 1u, line.size).trim();
+        var value = line.slice(colon as u32 + 1, line.size).trim();
 
         self.headers.insert(key, value);
     }
@@ -112,8 +119,8 @@ impl Response {
         // Content-Length
         var content_length = self.headers.get("Content-Length");
 
-        if (content_length.size() > 0u) {
-            var length = parse_u64(content_length, 64u);
+        if (content_length.size() > 0) {
+            var length = parse_u64(content_length, 10, 64);
 
             if (length.is_some()) {
                 self.body_mode = BodyMode::ContentLength;
@@ -129,24 +136,24 @@ impl Response {
     func read_byte(mut self) ?u8 {
         if (self.consumed < self.filled) {
             var b = self.buffer.ptr[self.consumed];
-            self.consumed += 1u;
+            self.consumed += 1;
             return b;
         }
 
         var b: u8;
-        var n = self.socket.read(MutSlice:[u8] { ptr: &b, size: 1u })?;
-        if (n == 0u) return Option:[u8]::none();
+        var n = self.socket.read(MutSlice:[u8] { ptr: &b, size: 1 })?;
+        if (n == 0) return Option:[u8]::none();
 
         return b;
     }
 
     func read_body_bytes(mut self, buffer: mut []u8) ?u64 {
-        var total: u64 = 0u;
+        var total: u64 = 0;
 
         // Drain leftover bytes from the header buffer first
         var leftover = self.filled - self.consumed;
 
-        if (leftover > 0u) {
+        if (leftover > 0) {
             var to_copy = leftover;
             if (to_copy > buffer.size) to_copy = buffer.size;
 
@@ -165,12 +172,12 @@ impl Response {
     }
 
     func read_fixed(mut self, buffer: mut []u8) ?u64 {
-        if (self.content_remaining == 0u) return 0u;
+        if (self.content_remaining == 0u) return 0;
 
         var to_read = buffer.size;
         if (to_read > self.content_remaining) to_read = self.content_remaining;
 
-        var read = self.read_body_bytes(buffer.slice(0u, to_read))?;
+        var read = self.read_body_bytes(buffer.slice(0, to_read))?;
         self.content_remaining -= read;
 
         return read;
@@ -195,10 +202,10 @@ impl Response {
         var to_read = buffer.size;
         if (to_read > self.chunk_remaining) to_read = self.chunk_remaining;
 
-        var read = self.read_body_bytes(buffer.slice(0u, to_read))?;
+        var read = self.read_body_bytes(buffer.slice(0, to_read))?;
         self.chunk_remaining -= read;
 
-        if (self.chunk_remaining == 0u) {
+        if (self.chunk_remaining == 0) {
             var cr = self.read_byte()?;
             if (cr != '\r') return Option:[u64]::none();
 
@@ -225,12 +232,12 @@ impl Response {
                 break;
             }
 
-            if (i >= 256u) return Option:[u64]::none();
+            if (i >= 256) return Option:[u64]::none();
             line[i] = b;
-            i += 1u;
+            i += 1;
         }
 
-        return parse_hex(StringView { ptr: &line[0], size: i });
+        return parse_u64(StringView { ptr: &line[0], size: i }, 16, 64);
     }
 
     /// Frees the response's header buffer, headers map and underlying socket.
@@ -253,44 +260,9 @@ impl Response : Reader {
 }
 
 func find_crlf(buffer: []u8) i64 {
-    for (var i = 0u; i + 1u < buffer.size; i++) {
-        if (buffer[i] == '\r' && buffer[i + 1u] == '\n') return i as i64;
+    for (var i = 0u; i + 1 < buffer.size; i++) {
+        if (buffer[i] == '\r' && buffer[i + 1] == '\n') return i as i64;
     }
 
     return -1;
-}
-
-func parse_u32(str: StringView) u32 {
-    var result: u32 = 0u;
-
-    for (var i = 0u; i < str.size; i++) {
-        var c = str.ptr[i];
-        if (c < '0' || c > '9') break;
-        result = result * 10u + (c - '0');
-    }
-
-    return result;
-}
-
-func parse_hex(str: StringView) u64 {
-    var result: u64 = 0u;
-
-    for (var i = 0u; i < str.size; i++) {
-        var c = str.ptr[i];
-        var digit: u64;
-
-        if (c >= '0' && c <= '9') {
-            digit = (c - '0') as u64;
-        } else if (c >= 'a' && c <= 'f') {
-            digit = (c - 'a' + 10u) as u64;
-        } else if (c >= 'A' && c <= 'F') {
-            digit = (c - 'A' + 10u) as u64;
-        } else {
-            break;
-        }
-
-        result = result * 16u as u64 + digit;
-    }
-
-    return result;
 }

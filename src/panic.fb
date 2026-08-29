@@ -28,7 +28,7 @@ func panic_handler(msg: StringView) {
 func error_callback(_data: *void, msg: *u8, err: i32) {
     var fmt = Formatter::new(stderr());
 
-    fmt.i64(err);
+    fmt.i64(err, 10);
     fmt.str(": ");
     fmt.str(from_cstring(msg));
     fmt.str("\n");
@@ -41,6 +41,8 @@ func backtrace_callback(data: *void, pc: u64, filename_cstr: *u8, line: i32, fun
     var frame = *frame_ptr;
     (*frame_ptr)++;
 
+    if (pc == 0xFFFFFFFFFFFFFFFF) return Code::Break;
+
     var function = "";
     if (function_cstr != null) function = from_cstring(function_cstr);
     if (function == "fb$std$panic_handler" || function == "fb$core$panic") return Code::Continue;
@@ -48,21 +50,21 @@ func backtrace_callback(data: *void, pc: u64, filename_cstr: *u8, line: i32, fun
 
     fmt.str("  [");
     if (frame < 10) fmt.str(" ");
-    fmt.u64(frame);
-    fmt.str("] ");
-    write_hex(fmt, pc);
+    fmt.u64(frame, 10);
+    fmt.str("] 0x");
+    fmt.u64(pc, 16);
 
     if (function_cstr != null) {
         fmt.str(" - ");
         fmt.str(function);
 
         if (filename_cstr != null) {
-            fmt.str("\n      at ");
+            fmt.str("\n       at ");
             fmt.str(from_cstring(filename_cstr));
         }
 
         fmt.str(":");
-        fmt.i64(line);
+        fmt.i64(line, 10);
     }
     else {
         fmt.str(" - <unknown function>");
@@ -71,37 +73,4 @@ func backtrace_callback(data: *void, pc: u64, filename_cstr: *u8, line: i32, fun
     fmt.str("\n");
 
     return Code::Continue;
-}
-
-func write_hex(fmt: Formatter, val: u64) {
-    if (val == 0) {
-        fmt.str("0x0");
-        return;
-    }
-
-    fmt.str("0x");
-
-    var buf: [16]u8;
-
-    var i: u32 = 16;
-    var temp = val;
-
-    while (temp > 0) {
-        i = i - 1;
-
-        // Get the lowest 4 bits (values 0 through 15)
-        var digit = (temp & 0xF) as u8;
-
-        // Convert to ASCII
-        if (digit < 10) {
-            buf[i] = '0' + digit;
-        } else {
-            buf[i] = ('A' - 10u) + digit;
-        }
-
-        // Shift right by 4 bits to process the next hex digit
-        temp = temp >>> 4;
-    }
-
-    fmt.str(StringView { ptr: &buf[i], size: 16 - i });
 }

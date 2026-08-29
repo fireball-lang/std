@@ -137,12 +137,12 @@ impl Duration : Display {
 
         // --- HOURS SCALE ---
         if (hours > 0) {
-            fmt.u64(hours);
+            fmt.u64(hours, 10);
             fmt.str("h");
 
             if (minutes > 0) {
                 fmt.str(" ");
-                fmt.u64(minutes);
+                fmt.u64(minutes, 10);
                 fmt.str("m");
             }
 
@@ -151,12 +151,12 @@ impl Duration : Display {
 
         // --- MINUTES SCALE ---
         if (minutes > 0) {
-            fmt.u64(minutes);
+            fmt.u64(minutes, 10);
             fmt.str("m");
 
             if (seconds > 0) {
                 fmt.str(" ");
-                fmt.u64(seconds);
+                fmt.u64(seconds, 10);
                 fmt.str("s");
             }
 
@@ -165,13 +165,13 @@ impl Duration : Display {
 
         // --- SECONDS SCALE ---
         if (seconds > 0) {
-            fmt.u64(seconds);
+            fmt.u64(seconds, 10);
             fmt.str("s");
 
             // Only show milliseconds if it's less than a minute total
             if (millis > 0) {
                 fmt.str(" ");
-                fmt.u64(millis);
+                fmt.u64(millis, 10);
                 fmt.str("ms");
             }
 
@@ -180,12 +180,12 @@ impl Duration : Display {
 
         // --- MILLISECONDS SCALE ---
         if (millis > 0) {
-            fmt.u64(millis);
+            fmt.u64(millis, 10);
             fmt.str("ms");
             // Threshold: Only show micros if under 100ms
             if (millis < 100 && micros > 0) {
                 fmt.str(" ");
-                fmt.u64(micros);
+                fmt.u64(micros, 10);
                 fmt.str("us");
             }
             return;
@@ -193,13 +193,13 @@ impl Duration : Display {
 
         // --- MICROSECONDS SCALE ---
         if (micros > 0) {
-            fmt.u64(micros);
+            fmt.u64(micros, 10);
             fmt.str("us");
 
             // Threshold: Only show nanos if under 100us (0.1ms)
             if (micros < 100 && nanos > 0) {
                 fmt.str(" ");
-                fmt.u64(nanos);
+                fmt.u64(nanos, 10);
                 fmt.str("ns");
             }
 
@@ -208,7 +208,7 @@ impl Duration : Display {
 
         // --- NANOSECONDS SCALE ---
         if (nanos > 0) {
-            fmt.u64(nanos);
+            fmt.u64(nanos, 10);
             fmt.str("ns");
             return;
         }

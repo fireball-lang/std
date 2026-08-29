@@ -7,13 +7,31 @@ pub enum FloatMode {
     Fixed,
 }
 
-pub func format_u64(w: mut Writer, value: u64) {
-    var buffer: [20]u8;
+/// Formats an unsigned 64-bit integer as a string in the specified base and writes it to a `Writer`.
+/// - `value` is the unsigned integer to format.
+/// - `base` is the radix (e.g., 2 for binary, 8 for octal, 10 for decimal, 16 for hexadecimal).
+///
+/// For bases greater than 10, uppercase letters `A` through `Z` are used.
+pub func format_u64(w: mut Writer, value: u64, base: u8) {
+    if (base < 2 || base > 36) {
+        panic("invalid base, can only be between 2 and 36");
+    }
+
+    var buffer: [64]u8;
     var len = 0u;
 
+    var b = base as u64;
+
     for (;;) {
-        buffer[len++] = '0' + (value % 10) as u8;
-        value /= 10;
+        var rem = (value % b) as u8;
+
+        if (rem < 10) {
+            buffer[len++] = '0' + rem;
+        } else {
+            buffer[len++] = 'A' + (rem - 10);
+        }
+
+        value /= b;
 
         if (value == 0) break;
     }
@@ -24,7 +42,13 @@ pub func format_u64(w: mut Writer, value: u64) {
     w.write(slice);
 }
 
-pub func format_i64(w: mut Writer, value: i64) {
+/// Formats a signed 64-bit integer as a string in the specified base and writes it to a `Writer`.
+/// - `value` is the signed integer to format.
+/// - `base` is the radix (e.g., 2 for binary, 8 for octal, 10 for decimal, 16 for hexadecimal).
+///
+/// If `value` is negative, a `-` is prepended to the output.
+/// For bases greater than 10, uppercase letters `A` through `Z` are used.
+pub func format_i64(w: mut Writer, value: i64, base: u8) {
     var uval = value as u64;
 
     if (value < 0) {
@@ -32,9 +56,15 @@ pub func format_i64(w: mut Writer, value: i64) {
         uval = (uval ^ 18446744073709551615u) + 1;
     }
 
-    format_u64(w, uval);
+    format_u64(w, uval, base);
 }
 
+/// Formats a 64-bit floating-point number as a string and writes it to a `Writer`.
+/// - `value` is the floating-point number to format. It safely handles `NaN` and `Infinity`.
+/// - `mode` dictates how trailing fractional zeros are handled (e.g., `FloatMode::Fixed` pads with zeros up to the precision, while other modes trim trailing zeros).
+/// - `precision` defines the number of digits to show after the decimal point (capped at a maximum of 64).
+///
+/// Numbers that are very large (>= 1,000,000,000,000,000.0) or very small (< 0.0001) will automatically be formatted using scientific notation (e.g., `1.5e6`).
 pub func format_f64(w: mut Writer, value: f64, mode: FloatMode, precision: u32) {
     // 1. Handle edge cases (NaN, Infinity)
     if (value != value) {
@@ -114,7 +144,7 @@ pub func format_f64(w: mut Writer, value: f64, mode: FloatMode, precision: u32) 
     var int_part = value as u64;
     var frac_part = value - (int_part as f64);
 
-    format_u64(w, int_part);
+    format_u64(w, int_part, 10);
 
     // 7. Extract Fractional Digits
     if (precision > 0) {
@@ -161,6 +191,6 @@ pub func format_f64(w: mut Writer, value: f64, mode: FloatMode, precision: u32) 
             w.write("e");
         }
 
-        format_u64(w, exp_val);
+        format_u64(w, exp_val, 10);
     }
 }
