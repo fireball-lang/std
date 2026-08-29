@@ -8,6 +8,14 @@ import std::os::unix::{Fd};
 import std::io::{Reader, Writer};
 import std::os::{File};
 
+/// Enum represeting standard input / output streams.
+/// The values match POSIX stdio values.
+pub enum StdStream {
+    Input = 0,
+    Output = 1,
+    Error = 2,
+}
+
 var stdin_file: File;
 var stdout_file: File;
 var stderr_file: File;
@@ -22,6 +30,15 @@ func ensure_stdio_initialized() {
     stderr_file = File::from_fd(Fd::stderr());
 
     stdio_initialised = true;
+}
+
+pub func get_std_stream(stream: StdStream) mut Reader {
+    ensure_stdio_initialized();
+
+    if (stream == StdStream::Input) return &stdin_file;
+    if (stream == StdStream::Output) return &stdout_file;
+
+    return &stderr_file;
 }
 
 pub func stdin() mut Reader {

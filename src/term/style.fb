@@ -1,0 +1,164 @@
+mod std::term;
+
+import std::term::{is_tty, enable_ansi};
+import std::os::{StdStream, get_env};
+import std::fmt::{Formatter};
+import std::io::{Writer};
+
+pub enum ColorMode {
+    Never,
+    Always,
+}
+
+impl ColorMode {
+    /// Returns the color mode based on the environment:
+    /// - Checks the 'NO_COLOR' environment variable.
+    /// - Checks if the standard output is a TTY
+    /// - Enable ANSI on the standard output using `enable_ansi` and returns `Never` if it fails
+    pub func auto() ColorMode {
+        if (get_env("NO_COLOR").is_some()) {
+            return ColorMode::Never;
+        }
+
+        if (!is_tty(StdStream::Output)) {
+            return ColorMode::Never;
+        }
+
+        if (!enable_ansi(StdStream::Output)) {
+            return ColorMode::Never;
+        }
+
+        return ColorMode::Always;
+    }
+}
+
+/// Represents the base 8 ANSI colors in both the normal and high intensity variants and a special `Default` value.
+pub enum Color {
+    Default,
+
+    Black,
+    Red,
+    Green,
+    Yellow,
+    Blue,
+    Purple,
+    Cyan,
+    White,
+
+    HiBlack,
+    HiRed,
+    HiGreen,
+    HiYellow,
+    HiBlue,
+    HiPurple,
+    HiCyan,
+    HiWhite,
+}
+
+impl Color {
+    /// Returns the ANSI color code for the foreground color.
+    pub func fg_code(self) u8 {
+        // Default
+        if (*self == Color::Default) {
+            return 39;
+        }
+
+        // High intensity
+        if (*self as u8 >= Color::HiBlack as u8) {
+            return 90 + (*self as u8) - (Color::HiBlack as u8);
+        }
+
+        // Normal
+        return 30 + (*self as u8) - (Color::Black as u8);
+    }
+
+    /// Returns the ANSI color code for the background color.
+    pub func bg_code(self) u8 {
+        return 10 + self.fg_code();
+    }
+}
+
+/// Represents a bit mask of text attributes.
+pub enum Attribute {
+    None = 0,
+    Bold = 1,
+    Italic = 2,
+    Underline = 4,
+}
+
+impl Attribute : BitOr[Attribute] {
+    type Result = Attribute;
+
+    pub func bit_or(self, rhs: Self) Self {
+        return ((*self as u8) | (rhs as u8)) as Self;
+    }
+}
+
+impl Attribute : BitAnd[Attribute] {
+    type Result = Attribute;
+
+    pub func bit_and(self, rhs: Self) Self {
+        return ((*self as u8) & (rhs as u8)) as Self;
+    }
+}
+
+/// Represents a style of text that can be applied on a terminal.
+pub struct Style {
+    /// Foreground color of the text.
+    pub fg: Color,
+    /// Background color of the text.
+    pub bg: Color,
+    /// Additional styling attributes of the text.
+    pub attrs: Attribute,
+}
+
+impl Style {
+    /// Resets the style of the writer to the default value.
+    pub func reset(w: mut Writer, mode: ColorMode) {
+        if (mode == ColorMode::Never) return;
+
+        w.write("\x1b[0m");
+    }
+
+    /// Applies the current style to the writer.
+    pub func apply(self, w: mut Writer, mode: ColorMode) {
+        if (mode == ColorMode::Never) return;
+
+        var fmt = Formatter::new(w);
+
+        w.write("\x1b[");
+
+        // Foreground & Background
+        fmt.u64(self.fg.fg_code());
+        w.write(";");
+        fmt.u64(self.bg.bg_code());
+
+        // Attributes
+        if ((self.attrs & Attribute::Bold) != Attribute::None) {
+            w.write(";1");
+        }
+        if ((self.attrs & Attribute::Italic) != Attribute::None) {
+            w.write(";3");
+        }
+        if ((self.attrs & Attribute::Underline) != Attribute::None) {
+            w.write(";4");
+        }
+
+        w.write("m");
+    }
+
+    /// Applies the current style to the writer and writes the string and then resets the style.
+    pub func print(self, w: mut Writer, str: StringView, mode: ColorMode) {
+        self.apply(w, mode);
+        w.write(str);
+        Style::reset(w, mode);
+    }
+
+    /// Applies the current style to the writer and writes the string and then resets the style.
+    pub func println(self, w: mut Writer, str: StringView, mode: ColorMode) {
+        self.apply(w, mode);
+        w.write(str);
+        Style::reset(w, mode);
+        w.write("\n");
+    }
+}

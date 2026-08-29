@@ -112,6 +112,17 @@ pub struct MachTimebaseInfo {
 }
 
 #[repr(C)]
+pub struct Termios {
+    pub iflag: u64,
+    pub oflag: u64,
+    pub cflag: u64,
+    pub lflag: u64,
+    pub cc: [20]u8,
+    pub ispeed: u64,
+    pub ospeed: u64,
+}
+
+#[repr(C)]
 pub struct SocketAddress {
     pub domain: u16,
     port: u16,
@@ -213,6 +224,9 @@ pub func mach_continuous_time() u64;
 
 #[extern]
 pub func mach_timebase_info(info: mut *MachTimebaseInfo) i32;
+
+#[extern]
+pub func ioctl(fd: i32, op: u64, argp: mut *void) i32;
 
 #[extern]
 pub func socket(domain: Domain, type_: Type, protocol: Protocol) i32;

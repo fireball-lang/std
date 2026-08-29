@@ -105,6 +105,16 @@ pub struct TimeSpec {
 }
 
 #[repr(C)]
+pub struct Termios {
+    pub iflag: u32,
+    pub oflag: u32,
+    pub cflag: u32,
+    pub lflag: u32,
+    pub line: u8,
+    pub cc: [16]u8,
+}
+
+#[repr(C)]
 pub struct SocketAddress {
     pub domain: u16,
     port: u16,
@@ -215,6 +225,10 @@ pub func exit(code: i32) {
 
 pub func clock_gettime(clk_id: i32, tp: mut* TimeSpec) i32 {
     return syscall2i(228, u64(clk_id), tp as u64) as i32;
+}
+
+pub func ioctl(fd: i32, op: u64, argp: mut *void) i32 {
+    return syscall3i(16, u64(fd), op, argp as u64) as i32;
 }
 
 pub func socket(domain: Domain, type_: Type, protocol: Protocol) i32 {

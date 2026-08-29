@@ -8,7 +8,7 @@ import std::io::{Reader, Writer};
 import std::sys;
 
 pub struct Fd {
-    handle: i32,
+    pub handle: i32,
 }
 
 impl Fd {

@@ -1,0 +1,139 @@
+mod std::term;
+
+import std::os::{StdStream};
+import std::sys;
+
+// is_tty
+
+/// Returns true if the specified standard IO stream is a TTY.
+#[cfg(target_os = "linux")]
+pub func is_tty(stream: StdStream) bool {
+    var termios: sys::Termios;
+    var result = sys::ioctl(stream as i32, 0x5401, &termios);
+
+    return result == 0;
+}
+
+/// Returns true if the specified standard IO stream is a TTY.
+#[cfg(target_os = "macos")]
+pub func is_tty(stream: StdStream) bool {
+    var termios: sys::Termios;
+    var result = sys::ioctl(stream as i32, 0x40487413, &termios);
+
+    return result == 0;
+}
+
+/// Returns true if the specified standard IO stream is a TTY.
+#[cfg(target_os = "windows")]
+pub func is_tty(stream: StdStream) bool {
+    // Get stdio handle
+    var handle: sys::Handle;
+
+    if (stream == StdStream::Input) handle = sys::GetStdHandle(-10 as u32);
+    else if (stream == StdStream::Output) handle = sys::GetStdHandle(-11 as u32);
+    else handle = sys::GetStdHandle(-12 as u32);
+
+    if (!handle.valid()) return false;
+
+    // Check console mode (we don't care if the handle is an input or a screen handle)
+    var mode: sys::InputConsoleMode;
+    var result = sys::GetInputConsoleMode(handle, &mode);
+
+    if (result != 0) return true;
+
+    // Check named pipe (Git Bash / MSYS2 / Cygwin)
+    var buffer: [1024]u8;
+    result = sys::GetFileInformationByHandleEx(handle, 2, &buffer[0], 1024);
+
+    if (result == 0) return false;
+
+    return is_msys_pty(buffer);
+}
+
+#[cfg(target_os = "windows")]
+func is_msys_pty(buffer: []u8) bool {
+    // GEt UTF16 character slice
+    var length_bytes = *(buffer.ptr as *u32);
+    if (length_bytes == 0 || length_bytes > buffer.size - 4) return false;
+
+    var chars = Slice:[u16] {
+        ptr: &(buffer.ptr as *u16)[2],
+        size: length_bytes / 2,
+    };
+
+    // Check string
+    var has_msys = false;
+    var has_pty = false;
+
+    for (var i = 0u; i < chars.size; i++) {
+        // Check for "msys-"
+        if (i + 4 < chars.size) {
+            if (chars[i] == 'm' && chars[i + 1] == 's' && chars[i + 2] == 'y' && chars[i + 3] == 's' && chars[i + 4] == '-') {
+                has_msys = true;
+            }
+        }
+
+        // Check for "cygwin-"
+        if (i + 6 < chars.size) {
+            if (chars[i] == 'c' && chars[i + 1] == 'y' && chars[i + 2] == 'g' && chars[i + 3] == 'w' && chars[i + 4] == 'i' && chars[i + 5] == 'n' && chars[i + 6] == '-') {
+                has_msys = true;
+            }
+        }
+
+        // Check for "-pty"
+        if (i + 3 < chars.size) {
+            if (chars[i] == '-' && chars[i+ 1] == 'p' && chars[i + 2] == 't' && chars[i+ 3] == 'y') {
+                has_pty = true;
+            }
+        }
+    }
+
+    return has_msys && has_pty;
+}
+
+// enable_ansi
+
+/// Enables processing of ANSI escape sequences on the specified standard IO stream.
+/// On Unix this is a NOP and always returns true.
+#[cfg(target_family = "unix")]
+pub func enable_ansi(_stream: StdStream) bool {
+    return true;
+}
+
+/// Enables processing of ANSI escape sequences on the specified standard IO stream.
+/// On Unix this is a NOP and always returns true.
+#[cfg(target_family = "windows")]
+pub func enable_ansi(stream: StdStream) bool {
+    // Get stdio handle
+    var handle: sys::Handle;
+
+    if (stream == StdStream::Input) handle = sys::GetStdHandle(-10 as u32);
+    else if (stream == StdStream::Output) handle = sys::GetStdHandle(-11 as u32);
+    else handle = sys::GetStdHandle(-12 as u32);
+
+    if (!handle.valid()) return false;
+
+    // Input
+    if (stream == StdStream::Input) {
+        var mode: sys::InputConsoleMode;
+
+        if (sys::GetInputConsoleMode(handle, &mode) == 0) {
+            // MSYS-like terminal emulators have ANSI enable by default and don't support the win32 terminal API
+            return is_tty(stream);
+        }
+
+        mode |= sys::InputConsoleMode::EnableVirtualTerminalInput;
+        return sys::SetInputConsoleMode(handle, mode) != 0;
+    }
+
+    // Screen
+    var mode: sys::ScreenConsoleMode;
+
+    if (sys::GetScreenConsoleMode(handle, &mode) == 0) {
+        // MSYS-like terminal emulators have ANSI enable by default and don't support the win32 terminal API
+        return is_tty(stream);
+    }
+
+    mode |= sys::ScreenConsoleMode::EnableVirtualTerminalProcessing;
+    return sys::SetScreenConsoleMode(handle, mode) != 0;
+}
