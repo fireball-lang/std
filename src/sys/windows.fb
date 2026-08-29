@@ -421,14 +421,14 @@ pub func QueryPerformanceCounter(performance_count: mut *u64) i32;
 #[extern]
 pub func QueryPerformanceFrequency(frequency: mut *u64) i32;
 
-#[extern]
+#[extern, link_name("GetConsoleMode")]
 pub func GetInputConsoleMode(handle: Handle, mode: mut *InputConsoleMode) i32;
-#[extern]
+#[extern, link_name("GetConsoleMode")]
 pub func GetScreenConsoleMode(handle: Handle, mode: mut *ScreenConsoleMode) i32;
 
-#[extern]
+#[extern, link_name("SetConsoleMode")]
 pub func SetInputConsoleMode(handle: Handle, mode: InputConsoleMode) i32;
-#[extern]
+#[extern, link_name("SetConsoleMode")]
 pub func SetScreenConsoleMode(handle: Handle, mode: ScreenConsoleMode) i32;
 
 #[extern, link_name("WSAStartup")]

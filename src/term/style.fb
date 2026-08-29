@@ -27,6 +27,9 @@ impl ColorMode {
         if (!enable_ansi(StdStream::Output)) {
             return ColorMode::Never;
         }
+        if (!enable_ansi(StdStream::Error)) {
+            return ColorMode::Never;
+        }
 
         return ColorMode::Always;
     }
