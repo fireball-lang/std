@@ -5,10 +5,18 @@ mod std::sys;
 // Enums
 
 pub enum Access : u32 {
-    All = 0x10000000,
+    All     = 0x10000000,
     Execute = 0x20000000,
-    Write = 0x40000000,
-    Read = 0x80000000,
+    Write   = 0x40000000,
+    Read    = 0x80000000,
+}
+
+impl Access : BitNot {
+    type Result = Access;
+
+    pub func bit_not(self) Self {
+        return ~(*self as u32) as Self;
+    }
 }
 
 impl Access : BitOr[Access] {
@@ -19,11 +27,27 @@ impl Access : BitOr[Access] {
     }
 }
 
+impl Access : BitAnd[Access] {
+    type Result = Access;
+
+    pub func bit_and(self, rhs: Self) Self {
+        return ((*self as u32) & (rhs as u32)) as Self;
+    }
+}
+
 pub enum Share : u32 {
     Exclusive = 0,
-    Read = 1,
-    Write = 2,
-    Delete = 4,
+    Read      = 1,
+    Write     = 2,
+    Delete    = 4,
+}
+
+impl Share : BitNot {
+    type Result = Share;
+
+    pub func bit_not(self) Self {
+        return ~(*self as u32) as Self;
+    }
 }
 
 impl Share : BitOr[Share] {
@@ -34,37 +58,53 @@ impl Share : BitOr[Share] {
     }
 }
 
+impl Share : BitAnd[Share] {
+    type Result = Share;
+
+    pub func bit_and(self, rhs: Self) Self {
+        return ((*self as u32) & (rhs as u32)) as Self;
+    }
+}
+
 pub enum Disposition : u32 {
-    CreateNew = 1,
-    CreateAlways = 2,
-    OpenExisting = 3,
-    OpenAlways = 4,
+    CreateNew        = 1,
+    CreateAlways     = 2,
+    OpenExisting     = 3,
+    OpenAlways       = 4,
     TruncateExisting = 5,
 }
 
 pub enum Flags : u32 {
     // Attributes
-    ReadOnly = 1,
-    Hidden = 2,
-    System = 4,
-    Archive = 32,
-    Normal = 128,
+    ReadOnly  = 1,
+    Hidden    = 2,
+    System    = 4,
+    Archive   = 32,
+    Normal    = 128,
     Temporary = 256,
-    Offline = 4096,
+    Offline   = 4096,
     Encrypted = 16384,
 
     // Flags
-    BackupSemantics = 0x02000000,
-    DeleteOnClose = 0x04000000,
-    NoBuffering = 0x20000000,
-    OpenNoRecall = 0x00100000,
+    BackupSemantics  = 0x02000000,
+    DeleteOnClose    = 0x04000000,
+    NoBuffering      = 0x20000000,
+    OpenNoRecall     = 0x00100000,
     OpenReparsePoint = 0x00200000,
-    Overlapped = 0x40000000,
-    PosixSemantics = 0x01000000,
-    RandomAccess = 0x10000000,
-    SessionAware = 0x00800000,
-    SequentialScan = 0x08000000,
-    WriteThrough = 0x80000000,
+    Overlapped       = 0x40000000,
+    PosixSemantics   = 0x01000000,
+    RandomAccess     = 0x10000000,
+    SessionAware     = 0x00800000,
+    SequentialScan   = 0x08000000,
+    WriteThrough     = 0x80000000,
+}
+
+impl Flags : BitNot {
+    type Result = Flags;
+
+    pub func bit_not(self) Self {
+        return ~(*self as u32) as Self;
+    }
 }
 
 impl Flags : BitOr[Flags] {
@@ -75,9 +115,25 @@ impl Flags : BitOr[Flags] {
     }
 }
 
+impl Flags : BitAnd[Flags] {
+    type Result = Flags;
+
+    pub func bit_and(self, rhs: Self) Self {
+        return ((*self as u32) & (rhs as u32)) as Self;
+    }
+}
+
 pub enum HandleFlags : u32 {
     Inherit = 1,
     ProtectFromClose = 2,
+}
+
+impl HandleFlags : BitNot {
+    type Result = HandleFlags;
+
+    pub func bit_not(self) Self {
+        return ~(*self as u32) as Self;
+    }
 }
 
 impl HandleFlags : BitOr[HandleFlags] {
@@ -88,15 +144,32 @@ impl HandleFlags : BitOr[HandleFlags] {
     }
 }
 
+impl HandleFlags : BitAnd[HandleFlags] {
+    type Result = HandleFlags;
+
+    pub func bit_and(self, rhs: Self) Self {
+        return ((*self as u32) & (rhs as u32)) as Self;
+    }
+}
+
 pub enum InputConsoleMode : u32 {
-    EnableProcessedInput = 0x0001,
-    EnableLineInput = 0x0002,
-    EnableEchoInput = 0x0004,
-    EnableWindowInput = 0x0008,
-    EnableMouseInput = 0x0010,
-    EnableInsertMode = 0x0020,
-    EnableQuickEditMode = 0x0040,
+    EnableProcessedInput       = 0x0001,
+    EnableLineInput            = 0x0002,
+    EnableEchoInput            = 0x0004,
+    EnableWindowInput          = 0x0008,
+    EnableMouseInput           = 0x0010,
+    EnableInsertMode           = 0x0020,
+    EnableQuickEditMode        = 0x0040,
+    EnableExtendedFlags        = 0x0080,
     EnableVirtualTerminalInput = 0x0200,
+}
+
+impl InputConsoleMode : BitNot {
+    type Result = InputConsoleMode;
+
+    pub func bit_not(self) Self {
+        return ~(*self as u32) as Self;
+    }
 }
 
 impl InputConsoleMode : BitOr[InputConsoleMode] {
@@ -116,11 +189,19 @@ impl InputConsoleMode : BitAnd[InputConsoleMode] {
 }
 
 pub enum ScreenConsoleMode : u32 {
-    EnableProcessedOutput = 0x0001,
-    EnableWrapAtEolOutput = 0x0002,
+    EnableProcessedOutput           = 0x0001,
+    EnableWrapAtEolOutput           = 0x0002,
     EnableVirtualTerminalProcessing = 0x0004,
-    DisableNewLineAutoReturn = 0x0008,
-    EnableLvbGridWorldwide = 0x0010,
+    DisableNewLineAutoReturn        = 0x0008,
+    EnableLvbGridWorldwide          = 0x0010,
+}
+
+impl ScreenConsoleMode : BitNot {
+    type Result = ScreenConsoleMode;
+
+    pub func bit_not(self) Self {
+        return ~(*self as u32) as Self;
+    }
 }
 
 impl ScreenConsoleMode : BitOr[ScreenConsoleMode] {
@@ -137,6 +218,117 @@ impl ScreenConsoleMode : BitAnd[ScreenConsoleMode] {
     pub func bit_and(self, rhs: Self) Self {
         return ((*self as u32) & (rhs as u32)) as Self;
     }
+}
+
+pub enum EventType : u16 {
+    Key              = 0x0001,
+    Mouse            = 0x0002,
+    WindowBufferSize = 0x0004,
+    Menu             = 0x0008,
+    Focus            = 0x0010,
+}
+
+pub enum ControlKeyState : u32 {
+    Capslock   = 0x0080,
+    Enhanced   = 0x0100,
+    LeftAlt    = 0x0002,
+    LeftCtrl   = 0x0008,
+    NumLock    = 0x0020,
+    RightAlt   = 0x0001,
+    RightCtrl  = 0x0004,
+    ScrollLock = 0x0040,
+    Shift      = 0x0010,
+}
+
+impl ControlKeyState : BitNot {
+    type Result = ControlKeyState;
+
+    pub func bit_not(self) Self {
+        return ~(*self as u32) as Self;
+    }
+}
+
+impl ControlKeyState : BitOr[ControlKeyState] {
+    type Result = ControlKeyState;
+
+    pub func bit_or(self, rhs: Self) Self {
+        return ((*self as u32) | (rhs as u32)) as Self;
+    }
+}
+
+impl ControlKeyState : BitAnd[ControlKeyState] {
+    type Result = ControlKeyState;
+
+    pub func bit_and(self, rhs: Self) Self {
+        return ((*self as u32) & (rhs as u32)) as Self;
+    }
+}
+
+pub enum ButtonState : u32 {
+    Left1     = 0x0001,
+    Left2     = 0x0004,
+    Left3     = 0x0008,
+    Left4     = 0x0010,
+    Rightmost = 0x0002,
+}
+
+impl ButtonState : BitNot {
+    type Result = ButtonState;
+
+    pub func bit_not(self) Self {
+        return ~(*self as u32) as Self;
+    }
+}
+
+impl ButtonState : BitOr[ButtonState] {
+    type Result = ButtonState;
+
+    pub func bit_or(self, rhs: Self) Self {
+        return ((*self as u32) | (rhs as u32)) as Self;
+    }
+}
+
+impl ButtonState : BitAnd[ButtonState] {
+    type Result = ButtonState;
+
+    pub func bit_and(self, rhs: Self) Self {
+        return ((*self as u32) & (rhs as u32)) as Self;
+    }
+}
+
+pub enum EventFlags : u32 {
+    DoubleClick           = 0x0002,
+    MouseHorizonalWheeled = 0x0008,
+    MouseMoved            = 0x0001,
+    MouseWheeled          = 0x0004,
+}
+
+impl EventFlags : BitNot {
+    type Result = EventFlags;
+
+    pub func bit_not(self) Self {
+        return ~(*self as u32) as Self;
+    }
+}
+
+impl EventFlags : BitOr[EventFlags] {
+    type Result = EventFlags;
+
+    pub func bit_or(self, rhs: Self) Self {
+        return ((*self as u32) | (rhs as u32)) as Self;
+    }
+}
+
+impl EventFlags : BitAnd[EventFlags] {
+    type Result = EventFlags;
+
+    pub func bit_and(self, rhs: Self) Self {
+        return ((*self as u32) & (rhs as u32)) as Self;
+    }
+}
+
+pub enum CodePage : u32 {
+    UTF8 = 65001,
 }
 
 pub enum Domain : i32 {
@@ -223,6 +415,83 @@ pub struct ProcessInformation {
     pub thread: Handle,
     pub process_id: u32,
     pub thread_id: u32,
+}
+
+#[repr(C)]
+pub struct Coord {
+    pub x: i16,
+    pub y: i16,
+}
+
+#[repr(C)]
+pub struct SmallRect {
+    pub left: i16,
+    pub top: i16,
+    pub right: i16,
+    pub bottom: i16,
+}
+
+#[repr(C)]
+pub struct ConsoleScreenBufferInfo {
+    pub size: Coord,
+    pub cursor_position: Coord,
+    pub attributes: u16,
+    pub window: SmallRect,
+    pub maximum_window_size: Coord,
+}
+
+#[repr(Union)]
+pub struct Char {
+    pub unicode: u16,
+    pub ascii: u8,
+}
+
+#[repr(C)]
+pub struct KeyEventRecord {
+    pub key_down: i32,
+    pub repeat_count: u16,
+    pub virtual_key_code: u16,
+    pub virtual_scan_code: u16,
+    pub char: Char,
+    pub control_key_state: ControlKeyState,
+}
+
+#[repr(C)]
+pub struct MouseEventRecord {
+    pub mouse_position: Coord,
+    pub button_state: ButtonState,
+    pub control_key_state: ControlKeyState,
+    pub event_flags: EventFlags,
+}
+
+#[repr(C)]
+pub struct WindowBufferSizeRecord {
+    pub size: Coord,
+}
+
+#[repr(C)]
+pub struct MenuEventRecord {
+    pub command_id: u32,
+}
+
+#[repr(C)]
+pub struct FocusEventRecord {
+    pub set: i32,
+}
+
+#[repr(Union)]
+pub struct Event {
+    pub key: KeyEventRecord,
+    pub mouse: MouseEventRecord,
+    pub window_buffer_size: WindowBufferSizeRecord,
+    pub menu: MenuEventRecord,
+    pub focus: FocusEventRecord,
+}
+
+#[repr(C)]
+pub struct InputRecord {
+    pub type_: EventType,
+    pub event: Event,
 }
 
 #[repr(C)]
@@ -431,6 +700,18 @@ pub func SetInputConsoleMode(handle: Handle, mode: InputConsoleMode) i32;
 #[extern, link_name("SetConsoleMode")]
 pub func SetScreenConsoleMode(handle: Handle, mode: ScreenConsoleMode) i32;
 
+#[extern]
+pub func GetConsoleScreenBufferInfo(handle: Handle, info: mut *ConsoleScreenBufferInfo) i32;
+
+#[extern]
+pub func ReadConsoleInputW(handle: Handle, buffer: mut *InputRecord, count: u32, read: mut *u32) i32;
+
+#[extern]
+pub func SetConsoleOutputCP(cp: CodePage) i32;
+
+#[extern]
+pub func SetConsoleCP(cp: CodePage) i32;
+
 #[extern, link_name("WSAStartup")]
 pub func wsa_startup(version: u16, data: mut* WsaData) i32;
 
@@ -487,3 +768,11 @@ pub func FreeCredentialsHandle(phCredential: *SecHandle) i32;
 
 #[extern]
 pub func FreeContextBuffer(pvContextBuffer: *void) i32;
+
+// Init
+
+#[init]
+func set_utf8_codepage() {
+    SetConsoleOutputCP(CodePage::UTF8);
+    SetConsoleCP(CodePage::UTF8);
+}

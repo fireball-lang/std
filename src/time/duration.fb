@@ -80,7 +80,7 @@ impl Duration {
     }
 
     /// Returns the duration in milliseconds, or `None` if the value would overflow `u64`.
-    func as_millis(self) ?u64 {
+    pub func as_millis(self) ?u64 {
         var nanos_part = (self.nanos / NANOS_PER_MILLI) as u64;
 
         if (self.secs > MAX_SECS_FOR_MILLIS) {

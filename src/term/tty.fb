@@ -6,25 +6,16 @@ import std::sys;
 // is_tty
 
 /// Returns true if the specified standard IO stream is a TTY.
-#[cfg(target_os = "linux")]
+#[cfg(target_family = "unix")]
 pub func is_tty(stream: StdStream) bool {
     var termios: sys::Termios;
-    var result = sys::ioctl(stream as i32, 0x5401, &termios);
+    var result = sys::ioctl(stream as i32, sys::IoctlOp::TCGETS, &termios);
 
     return result == 0;
 }
 
 /// Returns true if the specified standard IO stream is a TTY.
-#[cfg(target_os = "macos")]
-pub func is_tty(stream: StdStream) bool {
-    var termios: sys::Termios;
-    var result = sys::ioctl(stream as i32, 0x40487413, &termios);
-
-    return result == 0;
-}
-
-/// Returns true if the specified standard IO stream is a TTY.
-#[cfg(target_os = "windows")]
+#[cfg(target_family = "windows")]
 pub func is_tty(stream: StdStream) bool {
     // Get stdio handle
     var handle: sys::Handle;
@@ -93,40 +84,29 @@ func is_msys_pty(buffer: []u8) bool {
 
 // enable_ansi
 
-/// Enables processing of ANSI escape sequences on the specified standard IO stream.
-/// On Unix this is a NOP and always returns true.
+/// Enables processing of ANSI escape sequences on the specified standard output stream.
+/// If passed a `StdStream::Input` it always returns `false` without doing anything.
+/// On Unix this is a NOP and always returns true (apart from `StdStream::Input`).
 #[cfg(target_family = "unix")]
-pub func enable_ansi(_stream: StdStream) bool {
-    return true;
+pub func enable_ansi_output(stream: StdStream) bool {
+    return stream != StdStream::Input;
 }
 
-/// Enables processing of ANSI escape sequences on the specified standard IO stream.
-/// On Unix this is a NOP and always returns true.
+/// Enables processing of ANSI escape sequences on the specified standard output stream.
+/// If passed a `StdStream::Input` it always returns `false` without doing anything.
+/// On Unix this is a NOP and always returns true (apart from `StdStream::Input`).
 #[cfg(target_family = "windows")]
-pub func enable_ansi(stream: StdStream) bool {
+pub func enable_ansi_output(stream: StdStream) bool {
     // Get stdio handle
     var handle: sys::Handle;
 
-    if (stream == StdStream::Input) handle = sys::GetStdHandle(-10 as u32);
+    if (stream == StdStream::Input) return false;
     else if (stream == StdStream::Output) handle = sys::GetStdHandle(-11 as u32);
     else handle = sys::GetStdHandle(-12 as u32);
 
     if (!handle.valid()) return false;
 
-    // Input
-    if (stream == StdStream::Input) {
-        var mode: sys::InputConsoleMode;
-
-        if (sys::GetInputConsoleMode(handle, &mode) == 0) {
-            // MSYS-like terminal emulators have ANSI enable by default and don't support the win32 terminal API
-            return is_tty(stream);
-        }
-
-        mode |= sys::InputConsoleMode::EnableVirtualTerminalInput;
-        return sys::SetInputConsoleMode(handle, mode) != 0;
-    }
-
-    // Screen
+    // Screen console mode
     var mode: sys::ScreenConsoleMode;
 
     if (sys::GetScreenConsoleMode(handle, &mode) == 0) {

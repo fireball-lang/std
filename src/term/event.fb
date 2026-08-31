@@ -1,0 +1,547 @@
+mod std::term;
+
+import std::fmt::{Formatter, Display};
+import std::time::{Duration};
+import std::term::{Size};
+
+#[cfg(target_family = "windows")]
+import std::term::{EventSourceWin32};
+#[cfg(target_family = "unix")]
+import std::term::{EventSourceUnix};
+
+pub enum EventKind {
+    Key,
+    Button,
+    Motion,
+    Resize,
+    FocusGained,
+    FocusLost,
+}
+
+pub enum Modifier {
+    None = 0,
+    Shift = 1,
+    Ctrl = 2,
+    Alt = 4,
+}
+
+impl Modifier : BitNot {
+    type Result = Modifier;
+
+    pub func bit_not(self) Self {
+        return ~(*self as u8) as Self;
+    }
+}
+
+impl Modifier : BitOr[Modifier] {
+    type Result = Modifier;
+
+    pub func bit_or(self, rhs: Self) Self {
+        return ((*self as u8) | (rhs as u8)) as Self;
+    }
+}
+
+impl Modifier : BitAnd[Modifier] {
+    type Result = Modifier;
+
+    pub func bit_and(self, rhs: Self) Self {
+        return ((*self as u8) & (rhs as u8)) as Self;
+    }
+}
+
+impl Modifier {
+    pub func is_shift(self) bool {
+        return (*self & Self::Shift) == Self::Shift;
+    }
+
+    pub func is_ctrl(self) bool {
+        return (*self & Self::Ctrl) == Self::Ctrl;
+    }
+
+    pub func is_alt(self) bool {
+        return (*self & Self::Alt) == Self::Alt;
+    }
+}
+
+pub enum Key {
+    Char,
+
+    Enter,
+    Backspace,
+    Tab,
+    Esc,
+    Up,
+    Down,
+    Left,
+    Right,
+    Home,
+    End,
+    PageUp,
+    PageDown,
+    Delete,
+    Insert,
+
+    F1,
+    F2,
+    F3,
+    F4,
+    F5,
+    F6,
+    F7,
+    F8,
+    F9,
+    F10,
+    F11,
+    F12,
+}
+
+impl Key {
+    pub func is_f_key(self) bool {
+        return (*self as u8) >= (Key::F1 as u8) && (*self as u8) <= (Key::F12 as u8);
+    }
+
+    pub func name(self) StringView {
+        if (*self == Self::Char) return "Char";
+        if (*self == Self::Enter) return "Enter";
+        if (*self == Self::Backspace) return "Backspace";
+        if (*self == Self::Tab) return "Tab";
+        if (*self == Self::Esc) return "Esc";
+        if (*self == Self::Up) return "Up";
+        if (*self == Self::Down) return "Down";
+        if (*self == Self::Left) return "Left";
+        if (*self == Self::Right) return "Right";
+        if (*self == Self::Home) return "Home";
+        if (*self == Self::End) return "End";
+        if (*self == Self::PageUp) return "PageUp";
+        if (*self == Self::PageDown) return "PageDown";
+        if (*self == Self::Delete) return "Delete";
+        if (*self == Self::Insert) return "Insert";
+        if (*self == Self::F1) return "F1";
+        if (*self == Self::F2) return "F2";
+        if (*self == Self::F3) return "F3";
+        if (*self == Self::F4) return "F4";
+        if (*self == Self::F5) return "F5";
+        if (*self == Self::F6) return "F6";
+        if (*self == Self::F7) return "F7";
+        if (*self == Self::F8) return "F8";
+        if (*self == Self::F9) return "F9";
+        if (*self == Self::F10) return "F10";
+        if (*self == Self::F11) return "F11";
+        if (*self == Self::F12) return "F12";
+
+        panic("invalid Key");
+        return "";
+    }
+}
+
+pub struct KeyEvent {
+    pub key: Key,
+    pub char: u32,
+    pub mods: Modifier,
+}
+
+impl KeyEvent : Display {
+    pub func display(self, fmt: Formatter) {
+        if (self.mods.is_shift()) fmt.str("Shift + ");
+        if (self.mods.is_ctrl()) fmt.str("Ctrl + ");
+        if (self.mods.is_alt()) fmt.str("Alt + ");
+
+        if (self.key == Key::Char) {
+            var buf: [4]u8;
+            var len: u32 = 0;
+            var c = self.char;
+
+            if (c <= 0x7F) {
+                // 1-byte sequence (ASCII)
+                buf[0] = c as u8;
+                len = 1;
+            }
+            else if (c <= 0x7FF) {
+                // 2-byte sequence
+                buf[0] = (0xC0 | (c >> 6)) as u8;
+                buf[1] = (0x80 | (c & 0x3F)) as u8;
+                len = 2;
+            }
+            else if (c <= 0xFFFF) {
+                // 3-byte sequence
+                buf[0] = (0xE0 | (c >> 12)) as u8;
+                buf[1] = (0x80 | ((c >> 6) & 0x3F)) as u8;
+                buf[2] = (0x80 | (c & 0x3F)) as u8;
+                len = 3;
+            }
+            else if (c <= 0x10FFFF) {
+                // 4-byte sequence
+                buf[0] = (0xF0 | (c >> 18)) as u8;
+                buf[1] = (0x80 | ((c >> 12) & 0x3F)) as u8;
+                buf[2] = (0x80 | ((c >> 6) & 0x3F)) as u8;
+                buf[3] = (0x80 | (c & 0x3F)) as u8;
+                len = 4;
+            }
+            else {
+                // Invalid codepoint fallback
+                buf[0] = '?' as u8;
+                len = 1;
+            }
+
+            fmt.str("'");
+            fmt.str(StringView { ptr: &buf[0], size: len });
+            fmt.str("'");
+
+            return;
+        }
+
+        fmt.str(self.key.name());
+    }
+}
+
+pub enum Action {
+    Press,
+    Drag,
+    Release,
+}
+
+impl Action {
+    pub func name(self) StringView {
+        if (*self == Self::Press) return "Press";
+        if (*self == Self::Drag) return "Drag";
+        if (*self == Self::Release) return "Release";
+
+        panic("invalid Action");
+        return "";
+    }
+}
+
+pub enum Button {
+    None,
+    Left,
+    Middle,
+    Right,
+    ScrollUp,
+    ScrollDown,
+}
+
+impl Button {
+    pub func name(self) StringView {
+        if (*self == Self::None) return "None";
+        if (*self == Self::Left) return "Left";
+        if (*self == Self::Middle) return "Middle";
+        if (*self == Self::Right) return "Right";
+        if (*self == Self::ScrollUp) return "ScrollUp";
+        if (*self == Self::ScrollDown) return "ScrollDown";
+
+        panic("invalid Button");
+        return "";
+    }
+}
+
+pub struct ButtonEvent {
+    /// Whenever the button was pressed, dragged or released.
+    pub action: Action,
+
+    /// The button in question.
+    pub button: Button,
+
+    /// Modifier keys pressed when the event happened.
+    pub mods: Modifier,
+
+    /// 0-based column number.
+    pub x: u16,
+
+    /// 0-based line number.
+    pub y: u16,
+}
+
+impl ButtonEvent : Display {
+    pub func display(self, fmt: Formatter) {
+        fmt.str(self.action.name());
+        fmt.str(", ");
+
+        if (self.mods.is_shift()) fmt.str("Shift + ");
+        if (self.mods.is_ctrl()) fmt.str("Ctrl + ");
+        if (self.mods.is_alt()) fmt.str("Alt + ");
+
+        fmt.str(self.button.name());
+        fmt.str(", ");
+
+        fmt.u64(self.x, 10);
+        fmt.str(", ");
+        fmt.u64(self.y, 10);
+    }
+}
+
+pub struct MotionEvent {
+    /// 0-based column number.
+    pub x: u16,
+
+    /// 0-based line number.
+    pub y: u16,
+}
+
+impl MotionEvent : Display {
+    pub func display(self, fmt: Formatter) {
+        fmt.u64(self.x, 10);
+        fmt.str(", ");
+        fmt.u64(self.y, 10);
+    }
+}
+
+#[repr(Union)]
+struct EventData {
+    key: KeyEvent,
+    button: ButtonEvent,
+    motion: MotionEvent,
+    size: Size,
+}
+
+/// Represents any terminal event.
+pub struct Event {
+    pub kind: EventKind,
+
+    data: EventData,
+}
+
+impl Event {
+    /// Creates a new key event.
+    pub func new_key(data: KeyEvent) Self {
+        return Self {
+            kind: EventKind::Key,
+            data: EventData { key: data },
+        };
+    }
+
+    /// Creates a new mouse button event.
+    pub func new_button(data: ButtonEvent) Self {
+        return Self {
+            kind: EventKind::Button,
+            data: EventData { button: data },
+        };
+    }
+
+    /// Creates a new mouse motion event.
+    pub func new_motion(data: MotionEvent) Self {
+        return Self {
+            kind: EventKind::Motion,
+            data: EventData { motion: data },
+        };
+    }
+
+    /// Creates a new resize event.
+    pub func new_resize(data: Size) Self {
+        return Self {
+            kind: EventKind::Resize,
+            data: EventData { size: data },
+        };
+    }
+
+    /// Creates a new focus gained event.
+    pub func new_focus_gained() Self {
+        return Self {
+            kind: EventKind::FocusGained,
+        };
+    }
+
+    /// Creates a new focus lost event.
+    pub func new_focus_lost() Self {
+        return Self {
+            kind: EventKind::FocusLost,
+        };
+    }
+
+    /// Returns true if `kind` is `EventKind::Key`.
+    pub func is_key(self) bool {
+        return self.kind == EventKind::Key;
+    }
+
+    /// Returns the `KeyEvent` if this event is a key event or panics.
+    pub func key(self) KeyEvent {
+        if (self.kind != EventKind::Key) panic("event is not a key event");
+        return self.data.key;
+    }
+
+    /// Returns true if `kind` is `EventKind::Button`.
+    pub func is_button(self) bool {
+        return self.kind == EventKind::Button;
+    }
+
+    /// Returns the `ButonEvent` if this event is a key event or panics.
+    pub func button(self) ButtonEvent {
+        if (self.kind != EventKind::Button) panic("event is not a mouse button event");
+        return self.data.button;
+    }
+
+    /// Returns true if `kind` is `EventKind::Motion`.
+    pub func is_motion(self) bool {
+        return self.kind == EventKind::Motion;
+    }
+
+    /// Returns the `MotionEvent` if this event is a mouse motion event or panics.
+    pub func motion(self) MotionEvent {
+        if (self.kind != EventKind::Motion) panic("event is not a mouse motion event");
+        return self.data.motion;
+    }
+
+    /// Returns true if `kind` is `EventKind::Resize`.
+    pub func is_resize(self) bool {
+        return self.kind == EventKind::Resize;
+    }
+
+    /// Returns the `Size` if this event is a resize event or panics.
+    pub func size(self) Size {
+        if (self.kind != EventKind::Resize) panic("event is not a resize event");
+        return self.data.size;
+    }
+
+    /// Returns true if `kind` is `EventKind::FocusGained`.
+    pub func is_focus_gained(self) bool {
+        return self.kind == EventKind::FocusGained;
+    }
+
+    /// Returns true if `kind` is `EventKind::FocusLost`.
+    pub func is_focus_lost(self) bool {
+        return self.kind == EventKind::FocusLost;
+    }
+}
+
+impl Event : Display {
+    pub func display(self, fmt: Formatter) {
+        if (self.kind == EventKind::Key) {
+            fmt.str("Key(");
+            self.data.key.display(fmt);
+            fmt.str(")");
+        }
+        else if (self.kind == EventKind::Button) {
+            fmt.str("Button(");
+            self.data.button.display(fmt);
+            fmt.str(")");
+        }
+        else if (self.kind == EventKind::Motion) {
+            fmt.str("Motion(");
+            self.data.motion.display(fmt);
+            fmt.str(")");
+        }
+        else if (self.kind == EventKind::Resize) {
+            fmt.str("Resize(");
+            self.data.size.display(fmt);
+            fmt.str(")");
+        }
+        else if (self.kind == EventKind::FocusGained) {
+            fmt.str("FocusGained");
+        }
+        else if (self.kind == EventKind::FocusLost) {
+            fmt.str("FocusLost");
+        }
+    }
+}
+
+// Event Source (Unix)
+
+pub enum MouseEvents {
+    /// No mouse events.
+    None,
+
+    /// Only receives mouse button events.
+    Partial,
+
+    /// Receives both mouse button events and mouse motion events.
+    Full,
+}
+
+pub struct EventSourceOptions {
+    /// Configures what kind of mouse events should the application receive.
+    mouse: MouseEvents,
+
+    /// Disables special output processing for special characters.
+    /// For example, the `\n` character will only move the cursor down but not to the begging of the line.
+    disable_output_processing: bool,
+
+    /// Configures the timeout in milliseconds before responding with a `Key::Esc` event on ANSI-based backends.
+    /// The reason is that the same value as an escape key is used to start multi-byte escape sequences.
+    ansi_esc_timeout_ms: u16,
+}
+
+impl EventSourceOptions {
+    /// Provides sane defaults for a typical fullscreen (alternate buffer) application.
+    pub func default() Self {
+        return Self {
+            mouse: MouseEvents::Partial,
+            disable_output_processing: true,
+            ansi_esc_timeout_ms: 25,
+        };
+    }
+}
+
+var event_source_active: bool;
+
+#[cfg(target_family = "unix")]
+pub struct EventSource {
+    imp: EventSourceUnix,
+}
+
+#[cfg(target_family = "unix")]
+impl EventSource {
+    /// Creates new terminal event source and enables raw input mode according to the provided options.
+    pub func new(opts: EventSourceOptions) ?Self {
+        if (event_source_active) panic("an event source is already active");
+
+        var source = Self {
+            imp: EventSourceUnix::new(opts)?,
+        };
+
+        event_source_active = true;
+        return source;
+    }
+
+    /// Returns either `ansi` or `win32` based on which backend is being used.
+    pub func backend(self) StringView {
+        return "ansi";
+    }
+
+    /// Returns the next event waiting for a specific timeout or `None` if no event arrived in the timeout.
+    pub func next(mut self, timeout: Duration) ?Event {
+        return self.imp.next(timeout);
+    }
+
+    /// Releases underlying resources and disables raw input mode.
+    pub func free(mut self) {
+        self.imp.free();
+
+        event_source_active = false;
+    }
+}
+
+#[cfg(target_family = "windows")]
+pub struct EventSource {
+    imp: EventSourceWin32,
+}
+
+#[cfg(target_family = "windows")]
+impl EventSource {
+    /// Creates new terminal event source and enables raw input mode according to the provided options.
+    pub func new(opts: EventSourceOptions) ?Self {
+        if (event_source_active) panic("an event source is already active");
+
+        var source = Self {
+            imp: EventSourceWin32::new(opts)?,
+        };
+
+        event_source_active = true;
+        return source;
+    }
+
+    /// Returns either `ansi` or `win32` based on which backend is being used.
+    pub func backend(self) StringView {
+        return "win32";
+    }
+
+    /// Returns the next event waiting for a specific timeout or `None` if no event arrived in the timeout.
+    pub func next(mut self, timeout: Duration) ?Event {
+        return self.imp.next(timeout);
+    }
+
+    /// Releases underlying resources and disables raw input mode.
+    pub func free(mut self) {
+        self.imp.free();
+
+        event_source_active = false;
+    }
+}

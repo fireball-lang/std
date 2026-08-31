@@ -1,0 +1,8 @@
+mod std::c;
+
+pub enum Signal : i32 {
+    SIGWINCH = 28,
+}
+
+#[extern]
+pub func signal(sig: Signal, handler: func (sig: Signal)) *void;

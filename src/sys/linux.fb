@@ -7,11 +7,11 @@ import std::c::{from_cstring};
 // Enums
 
 pub enum FileFlags : i32 {
-    ReadOnly = 0,
-    WriteOnly = 1,
-    Create = 64,
-    Truncate = 512,
-    Directory = 65536,
+    ReadOnly    = 0,
+    WriteOnly   = 1,
+    Create      = 64,
+    Truncate    = 512,
+    Directory   = 65536,
     CloseOnExec = 524288,
 }
 
@@ -23,15 +23,31 @@ impl FileFlags : BitOr[FileFlags] {
     }
 }
 
-pub enum LibFlags : i32 {
-    Lazy = 0x00001,
-    Now = 0x00002,
-    NoLoad = 0x00004,
+impl FileFlags : BitAnd[FileFlags] {
+    type Result = FileFlags;
 
-    Global = 0x00100,
-    Local = 0x0000,
+    pub func bit_and(self, rhs: Self) Self {
+        return (*self as i32 & rhs as i32) as Self;
+    }
+}
+
+pub enum LibFlags : i32 {
+    Lazy     = 0x00001,
+    Now      = 0x00002,
+    NoLoad   = 0x00004,
+
+    Global   = 0x00100,
+    Local    = 0x0000,
 
     NoDelete = 0x01000,
+}
+
+impl LibFlags : BitNot {
+    type Result = LibFlags;
+
+    pub func bit_not(self) Result {
+        return ~(*self as i32) as Self;
+    }
 }
 
 impl LibFlags : BitOr[LibFlags] {
@@ -40,6 +56,245 @@ impl LibFlags : BitOr[LibFlags] {
     pub func bit_or(self, rhs: Self) Self {
         return (*self as i32 | rhs as i32) as Self;
     }
+}
+
+impl LibFlags : BitAnd[LibFlags] {
+    type Result = LibFlags;
+
+    pub func bit_and(self, rhs: Self) Self {
+        return (*self as i32 & rhs as i32) as Self;
+    }
+}
+
+pub enum IoctlOp : u64 {
+    TIOCGWINSZ = 0x5413,
+    TCGETS = 0x5401,
+    TCSETS = 0x5402,
+}
+
+pub enum PollEvent : i16 {
+    IN    = 0x0001,
+    PRI   = 0x0002,
+    OUT   = 0x0004,
+    ERR   = 0x0008,
+    HUP   = 0x0010,
+    NVAL  = 0x0020,
+}
+
+impl PollEvent : BitNot {
+    type Result = PollEvent;
+
+    pub func bit_not(self) Result {
+        return ~(*self as i16) as Self;
+    }
+}
+
+impl PollEvent : BitOr[PollEvent] {
+    type Result = PollEvent;
+
+    pub func bit_or(self, rhs: Self) Self {
+        return (*self as i16 | rhs as i16) as Self;
+    }
+}
+
+impl PollEvent : BitAnd[PollEvent] {
+    type Result = PollEvent;
+
+    pub func bit_and(self, rhs: Self) Self {
+        return (*self as i16 & rhs as i16) as Self;
+    }
+}
+
+pub enum InputFlags : u32 {
+    IGNBRK  = 0x00001,
+    BRKINT  = 0x00002,
+    IGNPAR  = 0x00004,
+    PARMRK  = 0x00008,
+    INPCK   = 0x00010,
+    ISTRIP  = 0x00020,
+    INLCR   = 0x00040,
+    IGNCR   = 0x00080,
+    ICRNL   = 0x00100,
+    IUCLC   = 0x00200,
+    IXON    = 0x00400,
+    IXANY   = 0x00800,
+    IXOFF   = 0x01000,
+    IMAXBEL = 0x02000,
+    IUTF8   = 0x04000,
+}
+
+impl InputFlags : BitNot {
+    type Result = InputFlags;
+
+    pub func bit_not(self) Result {
+        return ~(*self as u32) as Self;
+    }
+}
+
+impl InputFlags : BitOr[InputFlags] {
+    type Result = InputFlags;
+
+    pub func bit_or(self, rhs: Self) Self {
+        return (*self as u32 | rhs as u32) as Self;
+    }
+}
+
+impl InputFlags : BitAnd[InputFlags] {
+    type Result = InputFlags;
+
+    pub func bit_and(self, rhs: Self) Self {
+        return (*self as u32 & rhs as u32) as Self;
+    }
+}
+
+pub enum OutputFlags : u32 {
+    OPOST  = 0x00001,
+    OLCUC  = 0x00002,
+    ONLCR  = 0x00004,
+    OCRNL  = 0x00008,
+    ONOCR  = 0x00010,
+    ONLRET = 0x00020,
+    OFILL  = 0x00040,
+    OFDEL  = 0x00080,
+    NLDLY  = 0x00100,
+    CRDLY  = 0x00600,
+    CR1    = 0x00200,
+    CR2    = 0x00400,
+    TABDLY = 0x01800,
+    TAB1   = 0x00800,
+    TAB2   = 0x01000,
+    BSDLY  = 0x02000,
+    VTDLY  = 0x04000,
+    FFDLY  = 0x08000,
+}
+
+impl OutputFlags : BitNot {
+    type Result = OutputFlags;
+
+    pub func bit_not(self) Result {
+        return ~(*self as u32) as Self;
+    }
+}
+
+impl OutputFlags : BitOr[OutputFlags] {
+    type Result = OutputFlags;
+
+    pub func bit_or(self, rhs: Self) Self {
+        return (*self as u32 | rhs as u32) as Self;
+    }
+}
+
+impl OutputFlags : BitAnd[OutputFlags] {
+    type Result = OutputFlags;
+
+    pub func bit_and(self, rhs: Self) Self {
+        return (*self as u32 & rhs as u32) as Self;
+    }
+}
+
+pub enum ControlFlags : u32 {
+    CBAUD   = 0x0000100F,
+    CSIZE   = 0x00000030,
+    CS5     = 0x00000000,
+    CS6     = 0x00000010,
+    CS7     = 0x00000020,
+    CSTOPB  = 0x00000040,
+    CREAD   = 0x00000080,
+    PARENB  = 0x00000100,
+    PARODD  = 0x00000200,
+    HUPCL   = 0x00000400,
+    CLOCAL  = 0x00000800,
+    CBAUDEX = 0x00001000,
+    CIBAUD  = 0x100F0000,
+    CMSPAR  = 0x40000000,
+    CRTSCTS = 0x80000000,
+}
+
+impl ControlFlags : BitNot {
+    type Result = ControlFlags;
+
+    pub func bit_not(self) Result {
+        return ~(*self as u32) as Self;
+    }
+}
+
+impl ControlFlags : BitOr[ControlFlags] {
+    type Result = ControlFlags;
+
+    pub func bit_or(self, rhs: Self) Self {
+        return (*self as u32 | rhs as u32) as Self;
+    }
+}
+
+impl ControlFlags : BitAnd[ControlFlags] {
+    type Result = ControlFlags;
+
+    pub func bit_and(self, rhs: Self) Self {
+        return (*self as u32 & rhs as u32) as Self;
+    }
+}
+
+pub enum LocalFlags : u32 {
+    ISIG    = 0x00001,
+    ICANON  = 0x00002,
+    XCASE   = 0x00004,
+    ECHO    = 0x00008,
+    ECHOE   = 0x00010,
+    ECHOK   = 0x00020,
+    ECHONL  = 0x00040,
+    NOFLSH  = 0x00080,
+    TOSTOP  = 0x00100,
+    ECHOCTL = 0x00200,
+    ECHOPRT = 0x00400,
+    ECHOKE  = 0x00800,
+    FLUSHO  = 0x01000,
+    PENDIN  = 0x04000,
+    IEXTEN  = 0x08000,
+    EXTPROC = 0x10000,
+}
+
+impl LocalFlags : BitNot {
+    type Result = LocalFlags;
+
+    pub func bit_not(self) Result {
+        return ~(*self as u32) as Self;
+    }
+}
+
+impl LocalFlags : BitOr[LocalFlags] {
+    type Result = LocalFlags;
+
+    pub func bit_or(self, rhs: Self) Self {
+        return (*self as u32 | rhs as u32) as Self;
+    }
+}
+
+impl LocalFlags : BitAnd[LocalFlags] {
+    type Result = LocalFlags;
+
+    pub func bit_and(self, rhs: Self) Self {
+        return (*self as u32 & rhs as u32) as Self;
+    }
+}
+
+pub enum ControlChar : u32 {
+    VINTR    = 0,
+    VQUIT    = 1,
+    VERASE   = 2,
+    VKILL    = 3,
+    VEOF     = 4,
+    VTIME    = 5,
+    VMIN     = 6,
+    VSWTC    = 7,
+    VSTART   = 8,
+    VSTOP    = 9,
+    VSUSP    = 10,
+    VEOL     = 11,
+    VREPRINT = 12,
+    VDISCARD = 13,
+    VWERASE  = 14,
+    VLNEXT   = 15,
+    VEOL2    = 16,
 }
 
 pub enum Domain : i32 {
@@ -105,13 +360,36 @@ pub struct TimeSpec {
 }
 
 #[repr(C)]
+pub struct PollFd {
+    pub fd: i32,
+    pub req_events: PollEvent,
+    pub ret_events: PollEvent,
+}
+
+#[repr(C)]
 pub struct Termios {
-    pub iflag: u32,
-    pub oflag: u32,
-    pub cflag: u32,
-    pub lflag: u32,
+    pub input_flags: InputFlags,
+    pub output_flags: OutputFlags,
+    pub control_flags: ControlFlags,
+    pub local_flags: LocalFlags,
     pub line: u8,
-    pub cc: [16]u8,
+    pub control_chars: [16]u8,
+    pub input_speed: u32,
+    pub output_speed: u32,
+}
+
+impl Termios {
+    pub func control_char(mut self, char: ControlChar) mut &u8 {
+        return &self.control_chars[char as u32];
+    }
+}
+
+#[repr(C)]
+pub struct WinSize {
+    pub row: u16,
+    pub col: u16,
+    pub xpixel: u16,
+    pub ypixel: u16,
 }
 
 #[repr(C)]
@@ -227,8 +505,12 @@ pub func clock_gettime(clk_id: i32, tp: mut* TimeSpec) i32 {
     return syscall2i(228, u64(clk_id), tp as u64) as i32;
 }
 
-pub func ioctl(fd: i32, op: u64, argp: mut *void) i32 {
-    return syscall3i(16, u64(fd), op, argp as u64) as i32;
+pub func ioctl(fd: i32, op: IoctlOp, argp: mut *void) i32 {
+    return syscall3i(16, u64(fd), op as u64, argp as u64) as i32;
+}
+
+pub func poll(fds: mut *PollFd, count: u32, timeout: i32) i32 {
+    return syscall3i(7, fds as u64, count as u64, u64(timeout)) as i32;
 }
 
 pub func socket(domain: Domain, type_: Type, protocol: Protocol) i32 {

@@ -1,0 +1,248 @@
+#[cfg(target_family = "unix")]
+
+mod std::term;
+
+import std::term::{EventSourceOptions, MouseEvents, Event, KeyEvent, Key, Modifier, AnsiResult, parse_ansi_event, get_size};
+import std::time::{Instant, Duration};
+import std::c::{Signal, signal};
+import std::sys;
+
+struct EventSourceUnix {
+    fd: i32,
+    window_resize_read_fd: i32,
+
+    opts: EventSourceOptions,
+    original: sys::Termios,
+
+    buffer: [64]u8,
+    size: u32,
+}
+
+var window_resize_write_fb: i32;
+
+func handle_sigwinch(_sig: Signal) {
+    if (window_resize_write_fb > 0) {
+        var byte: u8 = 1;
+        sys::write(window_resize_write_fb, &byte, 1);
+    }
+}
+
+impl EventSourceUnix {
+    func new(opts: EventSourceOptions) ?Self {
+        // Try to use /dev/tty
+        var fd: i32 = 0;
+
+        fd = sys::openat(sys::at_fdcwd(), "/dev/tty".ptr, sys::FileFlags::CloseOnExec, 0);
+        if (fd < 0) fd = 0;
+
+        // Get current termios
+        var termios: sys::Termios;
+
+        var result = sys::ioctl(fd, sys::IoctlOp::TCGETS, &termios);
+        if (result < 0) return Option:[Self]::none();
+
+        var source = Self {
+            fd: fd,
+            opts: opts,
+            original: termios,
+        };
+
+        // Create window resize pipe
+        var fds: [2]i32;
+
+        result = sys::pipe(&fds[0]);
+
+        if (result < 0) {
+            source.free();
+            return Option:[Self]::none();
+        }
+
+        source.window_resize_read_fd = fds[0];
+        window_resize_write_fb = fds[1];
+
+        // Setup SIGWINCH signal
+        signal(Signal::SIGWINCH, handle_sigwinch);
+
+        // Enable mouse events
+        if (opts.mouse == MouseEvents::Partial) {
+            var enable_mouse_events = "\x1b[?1002h\x1b[?1006h";
+            sys::write(0, enable_mouse_events.ptr, enable_mouse_events.size);
+        }
+        else if (opts.mouse == MouseEvents::Full) {
+            var enable_mouse_events = "\x1b[?1003h\x1b[?1006h";
+            sys::write(0, enable_mouse_events.ptr, enable_mouse_events.size);
+        }
+
+        // Enable focus events
+        var enable_focus_events = "\x1b[?1004h";
+        sys::write(0, enable_focus_events.ptr, enable_focus_events.size);
+
+        // Enable raw mode
+        termios.input_flags &= ~(sys::InputFlags::IGNBRK | sys::InputFlags::BRKINT | sys::InputFlags::PARMRK |
+                                 sys::InputFlags::ISTRIP | sys::InputFlags::INLCR  | sys::InputFlags::IGNCR  |
+                                 sys::InputFlags::ICRNL  | sys::InputFlags::IXON);
+
+        // Disable output processing
+        if (opts.disable_output_processing) {
+            termios.output_flags &= ~(sys::OutputFlags::OPOST);
+        }
+
+        // Disable line processing
+        termios.local_flags &= ~(sys::LocalFlags::ECHO | sys::LocalFlags::ECHONL | sys::LocalFlags::ICANON |
+                                 sys::LocalFlags::ISIG | sys::LocalFlags::IEXTEN);
+
+        // Set character size to 8 bits
+        termios.control_flags &= ~(sys::ControlFlags::CSIZE | sys::ControlFlags::PARENB);
+        termios.control_flags |= sys::ControlFlags::CSIZE;
+
+        // Set blocking read
+        *termios.control_char(sys::ControlChar::VMIN) = 1;
+        *termios.control_char(sys::ControlChar::VTIME) = 0;
+
+        // Set new termios
+        result = sys::ioctl(fd, sys::IoctlOp::TCSETS, &termios);
+
+        if (result < 0) {
+            source.free();
+            return Option:[Self]::none();
+        }
+
+        return source;
+    }
+
+    func next(mut self, timeout: Duration) ?Event {
+        var user_timeout_millis = timeout.as_millis().expect("timeout value is too large") as i32;
+        if (user_timeout_millis > 2_147_483_647) panic("timeout value is too large");
+
+        var start_time = Instant::now();
+
+        for (;;) {
+            // Parse events already in buffer
+            while (self.size > 0) {
+                var result = self.parse_event();
+                if (result.incomplete) break;
+
+                if (result.event.is_some()) return result.event;
+            }
+
+            // Calculate remaining time
+            var elapsed = Instant::now().duration_since(start_time).as_millis().unwrap() as i32;
+
+            var remaining = user_timeout_millis - elapsed;
+            if (remaining < 0) remaining = 0;
+
+            // Determine poll timeout
+            var is_waiting_esc = self.size > 0 && self.buffer[0] == 0x1B;
+            var current_poll_timeout = remaining;
+
+            if (is_waiting_esc) {
+                if (current_poll_timeout > self.opts.ansi_esc_timeout_ms as i32) {
+                    current_poll_timeout = self.opts.ansi_esc_timeout_ms as i32;
+                }
+            }
+            else if (remaining <= 0) {
+                return Option:[Event]::none();
+            }
+
+            // Wait for data
+            var fds: [2]sys::PollFd;
+
+            fds[0] = sys::PollFd {
+                fd: self.fd,
+                req_events: sys::PollEvent::IN,
+            };
+
+            fds[1] = sys::PollFd {
+                fd: self.window_resize_read_fd,
+                req_events: sys::PollEvent::IN,
+            };
+
+            var poll_result = sys::poll(&fds[0], 2, current_poll_timeout);
+            if (poll_result < 0) continue;
+
+            // Check if we timed out
+            if (poll_result == 0) {
+                if (is_waiting_esc) {
+                    self.shift_buffer(1);
+
+                    return Event::new_key(KeyEvent {
+                        key: Key::Esc,
+                        char: 0,
+                        mods: Modifier::None,
+                    });
+                }
+                else {
+                    return Option:[Event]::none();
+                }
+            }
+
+            // Read new data
+            if ((fds[0].ret_events & sys::PollEvent::IN) == sys::PollEvent::IN) {
+                var read = sys::read(self.fd, &self.buffer[self.size], 64 - self.size);
+                if (read <= 0) return Option:[Event]::none();
+
+                self.size += read as u32;
+            }
+
+            // Query window size
+            if ((fds[1].ret_events & sys::PollEvent::IN) == sys::PollEvent::IN) {
+                var byte: u8;
+                sys::read(self.window_resize_read_fd, &byte, 1);
+
+                var size = get_size();
+                if (size.is_some()) return Event::new_resize(size.unwrap());
+            }
+        }
+
+        return Option:[Event]::none();
+    }
+
+    func free(mut self) {
+        // Disable mouse events
+        if (self.opts.mouse == MouseEvents::Partial) {
+            var disable_mouse_events = "\x1b[?1002l\x1b[?1006l";
+            sys::write(0, disable_mouse_events.ptr, disable_mouse_events.size);
+        }
+        else if (self.opts.mouse == MouseEvents::Full) {
+            var disable_mouse_events = "\x1b[?1003l\x1b[?1006l";
+            sys::write(0, disable_mouse_events.ptr, disable_mouse_events.size);
+        }
+
+        // Disable focus events
+        var disable_focus_events = "\x1b[?1004l";
+        sys::write(0, disable_focus_events.ptr, disable_focus_events.size);
+
+        // Restore termios and close /dev/tty
+        sys::ioctl(self.fd, sys::IoctlOp::TCSETS, &self.original);
+        if (self.fd != 0) sys::close(self.fd);
+
+        // Close window resize pipe
+        sys::close(self.window_resize_read_fd);
+        sys::close(window_resize_write_fb);
+
+        window_resize_write_fb = -1;
+    }
+
+    func parse_event(mut self) AnsiResult {
+        var result = parse_ansi_event(self.buffer_slice());
+
+        self.shift_buffer(result.consumed);
+        return result;
+    }
+
+    func shift_buffer(mut self, amount: u32) {
+        if (amount == 0) return;
+
+        if (amount >= self.size) {
+            self.size = 0;
+            return;
+        }
+
+        memmove(&self.buffer[0], &self.buffer[amount], self.size - amount);
+        self.size -= amount;
+    }
+
+    func buffer_slice(self) []u8 {
+        return (self.buffer as []u8).slice(0, self.size);
+    }
+}

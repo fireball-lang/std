@@ -1,0 +1,245 @@
+#[cfg(target_family = "windows")]
+
+mod std::term;
+
+import std::term::{EventSourceOptions, Event, MouseEvents, KeyEvent, Key, Modifier, ButtonEvent, MotionEvent, Button, Action, Size};
+import std::time::{Duration};
+import std::sys;
+
+pub struct EventSourceWin32 {
+    handle: sys::Handle,
+
+    opts: EventSourceOptions,
+    original_mode: sys::InputConsoleMode,
+
+    prev_buttons: sys::ButtonState,
+}
+
+impl EventSourceWin32 {
+    func new(opts: EventSourceOptions) ?Self {
+        var handle = sys::GetStdHandle(-10 as u32);
+
+        var original_mode: sys::InputConsoleMode;
+        if (sys::GetInputConsoleMode(handle, &original_mode) == 0) return Option:[Self]::none();
+
+        var new_mode = original_mode;
+
+        new_mode &= ~sys::InputConsoleMode::EnableLineInput;
+        new_mode &= ~sys::InputConsoleMode::EnableEchoInput;
+        new_mode &= ~sys::InputConsoleMode::EnableProcessedInput;
+
+        new_mode &= ~sys::InputConsoleMode::EnableQuickEditMode;
+        new_mode |= sys::InputConsoleMode::EnableExtendedFlags;
+
+        new_mode |= sys::InputConsoleMode::EnableWindowInput;
+
+        if (opts.mouse != MouseEvents::None) {
+            new_mode |= sys::InputConsoleMode::EnableMouseInput;
+        } else {
+            new_mode &= ~sys::InputConsoleMode::EnableMouseInput;
+        }
+
+        sys::SetInputConsoleMode(handle, new_mode);
+
+        return Self {
+            handle: handle,
+            opts: opts,
+            original_mode: original_mode,
+        };
+    }
+
+    func next(mut self, timeout: Duration) ?Event {
+        // Wait for events
+        var timeout_millis = timeout.as_millis().expect("timeout value is too large") as u32;
+        if (timeout_millis > 4_294_967_294) panic("timeout value is too large");
+
+        sys::WaitForSingleObject(self.handle, timeout_millis);
+
+        // Read single event
+        var record: sys::InputRecord;
+        var read: u32;
+
+        sys::ReadConsoleInputW(self.handle, &record, 1, &read);
+        if (read == 0) return Option:[Event]::none();
+
+        // Convert event
+        if (record.type_ == sys::EventType::Key) {
+            return convert_win32_key_event(record.event.key);
+        }
+
+        if (record.type_ == sys::EventType::Mouse) {
+            var event = self.convert_mouse_event(record.event.mouse);
+            if (event.is_motion() && self.opts.mouse != MouseEvents::Full) return Option:[Event]::none();
+            return event;
+        }
+
+        if (record.type_ == sys::EventType::WindowBufferSize) {
+            var size = record.event.window_buffer_size.size;
+
+            return Event::new_resize(Size {
+                width: size.x as u16,
+                height: size.y as u16,
+            });
+        }
+
+        if (record.type_ == sys::EventType::Focus) {
+            if (record.event.focus.set != 0) return Event::new_focus_gained();
+            return Event::new_focus_lost();
+        }
+
+        // Unknown event
+        return Option:[Event]::none();
+    }
+
+    func free(mut self) {
+        sys::SetInputConsoleMode(self.handle, self.original_mode);
+    }
+
+    func convert_mouse_event(mut self, event: sys::MouseEventRecord) Event {
+        var mods = convert_win32_modifiers(event.control_key_state);
+
+        var buttons = event.button_state;
+        var flags = event.event_flags;
+
+        // 1. Check for Scrolling
+        if (flags == sys::EventFlags::MouseWheeled) {
+            var delta = ((buttons as u32) >> 16) as i16;
+
+            var button = Button::ScrollDown;
+            if (delta > 0) button = Button::ScrollUp;
+
+            return Event::new_button(ButtonEvent {
+                action: Action::Press,
+                button: button,
+                mods: mods,
+                x: event.mouse_position.x as u16,
+                y: event.mouse_position.y as u16,
+            });
+        }
+
+        // 2. Determine which button is currently active
+        var button = Button::None;
+
+        if ((buttons & sys::ButtonState::Left1) == sys::ButtonState::Left1) button = Button::Left;
+        else if ((buttons & sys::ButtonState::Rightmost) == sys::ButtonState::Rightmost) button = Button::Right;
+        else if ((buttons & sys::ButtonState::Left2) == sys::ButtonState::Left2) button = Button::Middle;
+
+        // 3. Determine the Action
+        var action = Action::Press;
+
+        if (flags == sys::EventFlags::MouseMoved) {
+            if (buttons == 0 as sys::ButtonState) {
+                return Event::new_motion(MotionEvent {
+                    x: event.mouse_position.x as u16,
+                    y: event.mouse_position.y as u16,
+                });
+            }
+
+            action = Action::Drag;
+        }
+        else {
+            if (buttons == 0 as sys::ButtonState && self.prev_buttons != 0 as sys::ButtonState) {
+                action = Action::Release;
+
+                if ((self.prev_buttons & sys::ButtonState::Left1) == sys::ButtonState::Left1) button = Button::Left;
+                else if ((self.prev_buttons & sys::ButtonState::Rightmost) == sys::ButtonState::Rightmost) button = Button::Right;
+                else if ((self.prev_buttons & sys::ButtonState::Left2) == sys::ButtonState::Left2) button = Button::Middle;
+            }
+        }
+
+        // Update state for the next event
+        self.prev_buttons = buttons;
+
+        return Event::new_button(ButtonEvent {
+            action: action,
+            button: button,
+            mods: mods,
+            x: event.mouse_position.x as u16,
+            y: event.mouse_position.y as u16,
+        });
+    }
+}
+
+func convert_win32_key_event(event: sys::KeyEventRecord) ?Event {
+    // 1. Ignore KeyUp events
+    if (event.key_down == 0) {
+        return Option:[Event]::none();
+    }
+
+    // 2. Ignore standalone modifier keys generating phantom characters
+    var vk = event.virtual_key_code;
+
+    if (vk == 0x10 || vk == 0x11 || vk == 0x12 || vk == 0x14 || vk == 0x5B || vk == 0x5C) {
+        return Option:[Event]::none();
+    }
+
+    var mods = convert_win32_modifiers(event.control_key_state);
+    var key = Key::Char;
+    var unicode = event.char.unicode as u32;
+
+    // 3. Fix Control Key Combinations
+    if ((mods & Modifier::Ctrl) == Modifier::Ctrl) {
+        // If the unicode char is between 0x01 (Ctrl+A) and 0x1A (Ctrl+Z)
+        if (unicode >= 0x01 && unicode <= 0x1A) {
+            unicode = unicode + 0x60;
+        }
+        // Sometimes Windows sends 0 for unicode when modifiers are held.
+        // We can fallback to the Virtual Key code (0x41 'A' through 0x5A 'Z')
+        else if (unicode == 0 && vk >= 0x41 && vk <= 0x5A) {
+            unicode = (vk + 0x20) as u32;
+        }
+    }
+
+    // 4. Map special keys
+    if (vk == 0x0D) key = Key::Enter;
+    else if (vk == 0x08) key = Key::Backspace;
+    else if (vk == 0x09) key = Key::Tab;
+    else if (vk == 0x1B) key = Key::Esc;
+    else if (vk == 0x26) key = Key::Up;
+    else if (vk == 0x28) key = Key::Down;
+    else if (vk == 0x25) key = Key::Left;
+    else if (vk == 0x27) key = Key::Right;
+    else if (vk == 0x24) key = Key::Home;
+    else if (vk == 0x23) key = Key::End;
+    else if (vk == 0x21) key = Key::PageUp;
+    else if (vk == 0x22) key = Key::PageDown;
+    else if (vk == 0x2E) key = Key::Delete;
+    else if (vk == 0x2D) key = Key::Insert;
+    else if (vk >= 0x70 && vk <= 0x7B) key = ((Key::F1 as u8) + ((vk - 0x70) as u8)) as Key;
+
+    // Unix (ANSI) Parity
+    if (key == Key::Char) {
+        // If this is a standard character, Unix doesn't report Shift.
+        if ((mods & Modifier::Shift) == Modifier::Shift) {
+            mods &= ~Modifier::Shift;
+        }
+    }
+    else {
+        // If this is a special key (Arrow, Home, etc.), it has no character value.
+        unicode = 0;
+    }
+
+    return Event::new_key(KeyEvent {
+        key: key,
+        char: unicode,
+        mods: mods,
+    });
+}
+
+func convert_win32_modifiers(state: sys::ControlKeyState) Modifier {
+    var mods = Modifier::None;
+
+    if ((state & sys::ControlKeyState::Shift) == sys::ControlKeyState::Shift) {
+        mods |= Modifier::Shift;
+    }
+
+    if ((state & sys::ControlKeyState::LeftCtrl) == sys::ControlKeyState::LeftCtrl || (state & sys::ControlKeyState::RightCtrl) == sys::ControlKeyState::RightCtrl) {
+        mods |= Modifier::Ctrl;
+    }
+
+    if ((state & sys::ControlKeyState::LeftAlt) == sys::ControlKeyState::LeftAlt || (state & sys::ControlKeyState::RightAlt) == sys::ControlKeyState::RightAlt) {
+        mods |= Modifier::Alt;
+    }
+
+    return mods;
+}

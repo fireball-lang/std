@@ -1,0 +1,98 @@
+mod std::term;
+
+import std::fmt::{format_u64};
+import std::io::{Writer};
+
+// Alernate buffer
+
+/// Writes an ANSI sequence to the `Writer` that enables the alternate buffer.
+pub func enable_alternate_buffer(w: mut Writer) {
+    w.write("\x1b[?1049h");
+}
+
+/// Writes an ANSI sequence to the `Writer` that disables the alternate buffer.
+pub func disable_alternate_buffer(w: mut Writer) {
+    w.write("\x1b[?1049l");
+}
+
+// Clearing
+
+/// Writes an ANSI sequence to the `Writer` that clears the entire screen.
+pub func clear(w: mut Writer) {
+    w.write("\x1b[2J\x1b[H");
+}
+
+/// Writes an ANSI sequence to the `Writer` that clears the scrollback buffer.
+pub func clear_scrollback_buffer(w: mut Writer) {
+    w.write("\x1b[3J");
+}
+
+pub enum CursorOffset {
+    EndOfScreen,
+    BeginningOfScreen,
+    EndOfLine,
+    BeginningOfLine,
+}
+
+/// Writes an ANSI sequence to the `Writer` that clears the screen starting from the cursor up to the provied offset.
+pub func clear_from_cursor(w: mut Writer, to: CursorOffset) {
+    if (to == CursorOffset::EndOfScreen) w.write("\x1b[0J");
+    else if (to == CursorOffset::BeginningOfScreen) w.write("\x1b[1J");
+    else if (to == CursorOffset::EndOfLine) w.write("\x1b[0K");
+    else if (to == CursorOffset::BeginningOfLine) w.write("\x1b[1K");
+    else panic("invalid CursorOffset");
+}
+
+/// Writes and ANSI sequence to the `Writer` that clears the entire line the cursor is on.
+pub func clear_line(w: mut Writer) {
+    w.write("\x1b[2K");
+}
+
+// Cursor
+
+/// Writes an ANSI sequence to the `Writer` that shows the cursor.
+pub func show_cursor(w: mut Writer) {
+    w.write("\x1b[?25h");
+}
+
+/// Writes an ANSI sequence to the `Writer` that hides the cursor.
+pub func hide_cursor(w: mut Writer) {
+    w.write("\x1b[?25l");
+}
+
+/// Writes an ANSI sequence to the `Writer` that moves the cursor to the specified position in 0-based columns and lines.
+pub func move_cursor_to(w: mut Writer, x: u16, y: u16) {
+    w.write("\x1b[");
+    format_u64(w, x, 10);
+    w.write(";");
+    format_u64(w, y, 10);
+    w.write("H");
+}
+
+/// Writes an ANSI sequence to the `Writer` that moves the cursor up by `amount` lines.
+pub func move_cursor_up(w: mut Writer, amount: u16) {
+    w.write("\x1b[");
+    format_u64(w, amount, 10);
+    w.write("A");
+}
+
+/// Writes an ANSI sequence to the `Writer` that moves the cursor down by `amount` lines.
+pub func move_cursor_down(w: mut Writer, amount: u16) {
+    w.write("\x1b[");
+    format_u64(w, amount, 10);
+    w.write("B");
+}
+
+/// Writes an ANSI sequence to the `Writer` that moves the cursor right by `amount` columns.
+pub func move_cursor_right(w: mut Writer, amount: u16) {
+    w.write("\x1b[");
+    format_u64(w, amount, 10);
+    w.write("C");
+}
+
+/// Writes an ANSI sequence to the `Writer` that moves the cursor left by `amount` columns.
+pub func move_cursor_left(w: mut Writer, amount: u16) {
+    w.write("\x1b[");
+    format_u64(w, amount, 10);
+    w.write("D");
+}

@@ -1,6 +1,6 @@
 mod std::term;
 
-import std::term::{is_tty, enable_ansi};
+import std::term::{is_tty, enable_ansi_output};
 import std::os::{StdStream, get_env};
 import std::fmt::{Formatter};
 import std::io::{Writer};
@@ -24,10 +24,10 @@ impl ColorMode {
             return ColorMode::Never;
         }
 
-        if (!enable_ansi(StdStream::Output)) {
+        if (!enable_ansi_output(StdStream::Output)) {
             return ColorMode::Never;
         }
-        if (!enable_ansi(StdStream::Error)) {
+        if (!enable_ansi_output(StdStream::Error)) {
             return ColorMode::Never;
         }
 

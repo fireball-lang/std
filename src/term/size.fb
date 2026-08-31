@@ -1,0 +1,80 @@
+mod std::term;
+
+import std::fmt::{Formatter, Display, parse_u64};
+import std::os::{get_env};
+import std::sys;
+
+/// Size of a terminal window.
+pub struct Size {
+    /// Width in number of columns.
+    pub width: u16,
+
+    /// Height in number of lines.
+    pub height: u16,
+}
+
+impl Size : Display {
+    pub func display(self, fmt: Formatter) {
+        fmt.u64(self.width, 10);
+        fmt.str(" x ");
+        fmt.u64(self.height, 10);
+    }
+}
+
+/// Attempts to retrieve the size of the terminal window in number of columns and lines.
+pub func get_size() ?Size {
+    // Native API
+    var size = get_size_native();
+    if (size.is_some()) return size;
+
+    // Env fallback
+    return get_size_env();
+}
+
+func get_size_env() ?Size {
+    var columns_str = get_env("COLUMNS") or "";
+    if (columns_str == "") return Option:[Size]::none();
+
+    var lines_str = get_env("LINES") or "";
+    if (lines_str == "") return Option:[Size]::none();
+
+    var columns = parse_u64(columns_str, 10, 16);
+    if (columns.is_none()) return Option:[Size]::none();
+
+    var lines = parse_u64(lines_str, 10, 16);
+    if (lines.is_none()) return Option:[Size]::none();
+
+    return Size {
+        width: columns.unwrap() as u16,
+        height: lines.unwrap() as u16,
+    };
+}
+
+#[cfg(target_family = "unix")]
+func get_size_native() ?Size {
+    var win_size: sys::WinSize;
+
+    var result = sys::ioctl(1, sys::IoctlOp::TIOCGWINSZ, &win_size);
+    if (result != 0) return Option:[Size]::none();
+
+    return Size {
+        width: win_size.col,
+        height: win_size.row,
+    };
+}
+
+#[cfg(target_family = "windows")]
+func get_size_native() ?Size {
+    var handle = sys::GetStdHandle(-11 as u32);
+    if (!handle.valid()) return Option:[Size]::none();
+
+    var info: sys::ConsoleScreenBufferInfo;
+
+    var result = sys::GetConsoleScreenBufferInfo(handle, &info);
+    if (result == 0) return Option:[Size]::none();
+
+    return Size {
+        width: (info.window.right - info.window.left) as u16 + 1,
+        height: (info.window.bottom - info.window.top) as u16 + 1,
+    };
+}
