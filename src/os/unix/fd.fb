@@ -14,7 +14,7 @@ pub struct Fd {
 impl Fd {
     pub func create(path: StringView) ?Fd {
         var path_c = to_cstring(path);
-        var handle = sys::openat(sys::at_fdcwd(), path_c, sys::FileFlags::Create | sys::FileFlags::Truncate | sys::FileFlags::WriteOnly | sys::FileFlags::CloseOnExec, 438);
+        var handle = sys::openat(sys::AT_FDCWD, path_c, sys::FileFlags::Create | sys::FileFlags::Truncate | sys::FileFlags::WriteOnly | sys::FileFlags::CloseOnExec, 438);
         free(path_c);
 
         if (handle < 0) return Option:[Fd]::none();
@@ -23,7 +23,7 @@ impl Fd {
 
     pub func open(path: StringView) ?Fd {
         var path_c = to_cstring(path);
-        var handle = sys::openat(sys::at_fdcwd(), path_c, sys::FileFlags::ReadOnly | sys::FileFlags::CloseOnExec, 0);
+        var handle = sys::openat(sys::AT_FDCWD, path_c, sys::FileFlags::ReadOnly | sys::FileFlags::CloseOnExec, 0);
         free(path_c);
 
         if (handle < 0) return Option:[Fd]::none();
@@ -82,7 +82,7 @@ impl Fd : Writer {
 pub func stat(path: *u8) ?FileInfo {
     // Call native API
     var stat: sys::Stat;
-    var result = sys::fstatat(sys::at_fdcwd(), path, &stat, 0);
+    var result = sys::fstatat(sys::AT_FDCWD, path, &stat, 0);
 
     if (result == -1) return Option:[FileInfo]::none();
 

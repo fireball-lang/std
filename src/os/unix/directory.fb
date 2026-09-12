@@ -57,7 +57,7 @@ pub struct DirIterator {
 
 pub func list_dir(path: StringView) ?DirIterator {
     var c_path = to_cstring(path);
-    var dir = sys::openat(sys::at_fdcwd(), c_path, sys::FileFlags::ReadOnly | sys::FileFlags::Directory, 0);
+    var dir = sys::openat(sys::AT_FDCWD, c_path, sys::FileFlags::ReadOnly | sys::FileFlags::Directory, 0);
 
     if (dir < 0) {
         free(c_path);

@@ -75,7 +75,7 @@ pub func spawn(info: ProcessInfo) ?Process {
             }
 
             if (info.stdin == Stdio::Null) {
-                var fd = sys::openat(sys::at_fdcwd(), "/dev/null".ptr, sys::FileFlags::ReadOnly, 0);
+                var fd = sys::openat(sys::AT_FDCWD, "/dev/null".ptr, sys::FileFlags::ReadOnly, 0);
                 sys::dup2(fd, 0);
                 sys::close(fd);
             }
@@ -86,7 +86,7 @@ pub func spawn(info: ProcessInfo) ?Process {
             }
 
             if (info.stdout == Stdio::Null) {
-                var fd = sys::openat(sys::at_fdcwd(), "/dev/null".ptr, sys::FileFlags::WriteOnly, 0);
+                var fd = sys::openat(sys::AT_FDCWD, "/dev/null".ptr, sys::FileFlags::WriteOnly, 0);
                 sys::dup2(fd, 1);
                 sys::close(fd);
             }
@@ -97,7 +97,7 @@ pub func spawn(info: ProcessInfo) ?Process {
             }
 
             if (info.stderr == Stdio::Null) {
-                var fd = sys::openat(sys::at_fdcwd(), "/dev/null".ptr, sys::FileFlags::WriteOnly, 0);
+                var fd = sys::openat(sys::AT_FDCWD, "/dev/null".ptr, sys::FileFlags::WriteOnly, 0);
                 sys::dup2(fd, 2);
                 sys::close(fd);
             }

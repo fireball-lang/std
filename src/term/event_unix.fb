@@ -32,7 +32,7 @@ impl EventSourceUnix {
         // Try to use /dev/tty
         var fd: i32 = 0;
 
-        fd = sys::openat(sys::at_fdcwd(), "/dev/tty".ptr, sys::FileFlags::CloseOnExec, 0);
+        fd = sys::openat(sys::AT_FDCWD, "/dev/tty".ptr, sys::FileFlags::CloseOnExec, 0);
         if (fd < 0) fd = 0;
 
         // Get current termios

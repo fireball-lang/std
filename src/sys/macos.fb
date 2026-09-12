@@ -558,6 +558,4 @@ pub func CFRelease(cf: *void);
 
 // Utils
 
-pub func at_fdcwd() i32 {
-    return -2;
-}
+pub const AT_FDCWD: i32 = -2;
