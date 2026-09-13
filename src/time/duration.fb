@@ -2,28 +2,15 @@ mod std::time;
 
 import std::fmt::{Display, Formatter};
 
-var NANOS_PER_SEC: u32;
-var NANOS_PER_MILLI: u32;
-var MILLIS_PER_SEC: u64;
-var SECS_PER_HOUR: u64;
+const NANOS_PER_SEC: u32 = 1_000_000_000u;
+const NANOS_PER_MILLI: u32 = 1_000_000u;
+const MILLIS_PER_SEC: u64 = 1_000u;
+const SECS_PER_HOUR: u64 = 3_600u;
 
-var MAX_SECS_FOR_MILLIS: u64;
-var MAX_MILLIS_REMAINDER: u64;
-var MAX_SECS_FOR_NANOS: u64;
-var MAX_NANOS_REMAINDER: u64;
-
-#[init]
-func init_constants() {
-    NANOS_PER_SEC = 1_000_000_000u;
-    NANOS_PER_MILLI = 1_000_000u;
-    MILLIS_PER_SEC = 1_000u;
-    SECS_PER_HOUR = 3_600u;
-
-    MAX_SECS_FOR_MILLIS = 18_446_744_073_709_551u;
-    MAX_MILLIS_REMAINDER = 615u;
-    MAX_SECS_FOR_NANOS = 18_446_744_073u;
-    MAX_NANOS_REMAINDER = 709_551_615u;
-}
+const MAX_SECS_FOR_MILLIS: u64 = 18_446_744_073_709_551u;
+const MAX_MILLIS_REMAINDER: u64 = 615u;
+const MAX_SECS_FOR_NANOS: u64 = 18_446_744_073u;
+const MAX_NANOS_REMAINDER: u64 = 709_551_615u;
 
 /// Duration of time stored as a pair of seconds and the number of nanoseconds in the remainder of the current second.
 ///
