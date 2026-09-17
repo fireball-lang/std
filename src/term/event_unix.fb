@@ -111,8 +111,8 @@ impl EventSourceUnix {
     }
 
     func next(mut self, timeout: Duration) ?Event {
-        var user_timeout_millis = timeout.as_millis().expect("timeout value is too large") as i32;
-        if (user_timeout_millis > 2_147_483_647) panic("timeout value is too large");
+        var user_timeout_millis = timeout.as_millis().expect("timeout value is too large");
+        if (user_timeout_millis > i32::MAX as u32) panic("timeout value is too large");
 
         var start_time = Instant::now();
 
@@ -128,7 +128,7 @@ impl EventSourceUnix {
             // Calculate remaining time
             var elapsed = Instant::now().duration_since(start_time).as_millis().unwrap() as i32;
 
-            var remaining = user_timeout_millis - elapsed;
+            var remaining = (user_timeout_millis as i32) - elapsed;
             if (remaining < 0) remaining = 0;
 
             // Determine poll timeout

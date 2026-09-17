@@ -126,7 +126,7 @@ impl TlsSocket {
     }
 
     pub func receive(mut self, buffer: mut []u8) ?u64 {
-        if (buffer.size > 2_147_483_647u) buffer = buffer.slice(0u, 2_147_483_647u);
+        if (buffer.size > i32::MAX as u32) buffer = buffer.slice(0u, i32::MAX as u32);
 
         var result = openssl.ssl_read(self.ssl, buffer.ptr, buffer.size as i32);
         if (result < 0) return Option:[u64]::none();
@@ -135,7 +135,7 @@ impl TlsSocket {
     }
 
     pub func send(mut self, data: []u8) ?u64 {
-        if (data.size > 2_147_483_647u) data = data.slice(0u, 2_147_483_647u);
+        if (data.size > i32::MAX as u32) data = data.slice(0u, i32::MAX as u32);
 
         var result = openssl.ssl_write(self.ssl, data.ptr, data.size as i32);
         if (result < 0) return Option:[u64]::none();
