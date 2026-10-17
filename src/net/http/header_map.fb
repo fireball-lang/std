@@ -53,20 +53,42 @@ pub struct HeaderMap {
 }
 
 impl HeaderMap {
-    /// Inserts `value` under `key`, replacing the value if `key` is already present.
-    pub func insert(mut self, key: StringView, value: StringView) {
+    func find(self, key: StringView) *HeaderValue {
         for (var i = 0u; i < self.headers.size(); i++) {
-            var item = self.headers.get_ptr(i);
+            var item = &self.headers[i];
 
             if (case_insensitive_eq(item.key, key)) {
-                item.value = HeaderValue { value: value };
-                return;
+                return &item.value;
             }
+        }
+
+        return null;
+    }
+
+    func find_mut(mut self, key: StringView) mut *HeaderValue {
+        for (var i = 0u; i < self.headers.size(); i++) {
+            var item = &self.headers[i];
+
+            if (case_insensitive_eq(item.key, key)) {
+                return &item.value;
+            }
+        }
+
+        return null;
+    }
+
+    /// Inserts `value` under `key`, replacing the value if `key` is already present.
+    pub func insert(mut self, key: StringView, value: StringView) {
+        var ptr = self.find_mut(key);
+
+        if (ptr != null) {
+            *ptr = HeaderValue { value: value};
+            return;
         }
 
         self.headers.add(Header {
             key: key,
-            value: HeaderValue { value: value },
+            value: HeaderValue { value: value},
         });
     }
 
@@ -74,7 +96,7 @@ impl HeaderMap {
     /// Returns `true` if the key was found, `false` otherwise.
     pub func try_get(self, key: StringView, value: mut* HeaderValue) bool {
         for (var i = 0u; i < self.headers.size(); i++) {
-            var item = self.headers.get_ptr(i);
+            var item = &self.headers[i];
 
             if (case_insensitive_eq(item.key, key)) {
                 *value = item.value;
@@ -107,7 +129,7 @@ impl HeaderMap {
     /// Removes `key` and returns its previous value, or a default-initialized `HeaderValue` if absent.
     pub func remove(mut self, key: StringView) HeaderValue {
         for (var i = 0u; i < self.headers.size(); i++) {
-            var item = self.headers.get_ptr(i);
+            var item = &self.headers[i];
 
             if (case_insensitive_eq(item.key, key)) {
                 var value = item.value;
@@ -139,11 +161,23 @@ impl HeaderMap : Index[StringView] {
     type Result = HeaderValue;
 
     /// Looks up `key`. Panics if it is not present.
-    pub func index(self, i: StringView) HeaderValue {
-        var value: HeaderValue;
-        if (!self.try_get(i, &value)) panic("HeaderMap::[] - value not found");
+    pub func index(self, i: StringView) &HeaderValue {
+        var ptr = self.find(i);
+        if (ptr == null) panic("ArrayMap::[] - value not found");
 
-        return value;
+        return ptr as &HeaderValue;
+    }
+}
+
+impl HeaderMap : IndexMut[StringView] {
+    type Result = HeaderValue;
+
+    /// Looks up `key`. Panics if it is not present.
+    pub func index_mut(mut self, i: StringView) mut &HeaderValue {
+        var ptr = self.find(i);
+        if (ptr == null) panic("ArrayMap::[] - value not found");
+
+        return ptr as mut &HeaderValue;
     }
 }
 
@@ -151,7 +185,7 @@ func case_insensitive_eq(a: StringView, b: StringView) bool {
     if (a.size != b.size) return false;
 
     for (var i = 0u; i < a.size; i++) {
-        if (to_lower(a.ptr[i]) != to_lower(b.ptr[i])) return false;
+        if (to_lower(a[i]) != to_lower(b[i])) return false;
     }
 
     return true;

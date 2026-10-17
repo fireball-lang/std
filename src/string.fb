@@ -35,7 +35,7 @@ impl String {
         return self.bytes as []u8;
     }
 
-    pub func as_mut_bytes(self) mut []u8 {
+    pub func as_mut_bytes(mut self) mut []u8 {
         return self.bytes.as_mut_slice();
     }
 
@@ -104,6 +104,22 @@ impl String : Eq[StringView] {
 impl String : Ord[StringView] {
     pub func ord(self, rhs: StringView) Ordering {
         return (*self as StringView).ord(rhs);
+    }
+}
+
+impl String : Index[u64] {
+    type Result = u8;
+
+    func index(self, i: u64) &u8 {
+        return &self.bytes[i];
+    }
+}
+
+impl String : IndexMut[u64] {
+    type Result = u8;
+
+    func index_mut(mut self, i: u64) mut &u8 {
+        return &self.bytes[i];
     }
 }
 

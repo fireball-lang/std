@@ -98,7 +98,7 @@ impl Reader {
             self.advance(false)?;
             self.skip_whitespace()?;
 
-            self.entities.get_ptr(self.entities.size() - 1).property = false;
+            self.entities[self.entities.size() - 1].property = false;
 
             return token;
         }
@@ -165,7 +165,7 @@ impl Reader {
                 return Option:[bool]::none();
             }
 
-            var entity = self.entities.get_ptr(self.entities.size() - 1);
+            var entity = &self.entities[self.entities.size() - 1];
             if (entity.kind == EntityKind::Object) entity.property = true;
 
             return true;

@@ -96,10 +96,6 @@ impl[T] ArrayList[T] {
         return self.capacity;
     }
 
-    pub func get_ptr(mut self, index: u64) mut* T {
-        return &self.ptr[index];
-    }
-
     pub func free(mut self) {
         if (self.ptr == null) return;
 
@@ -150,8 +146,16 @@ impl[T: Ord[T]] ArrayList[T] : Ord[[]T] {
 impl[T] ArrayList[T] : Index[u64] {
     type Result = T;
 
-    pub func index(self, i: u64) T {
-        return self.ptr[i];
+    pub func index(self, i: u64) &T {
+        return &self.ptr[i] as &T;
+    }
+}
+
+impl[T] ArrayList[T] : IndexMut[u64] {
+    type Result = T;
+
+    pub func index_mut(mut self, i: u64) mut &T {
+        return &self.ptr[i] as mut &T;
     }
 }
 

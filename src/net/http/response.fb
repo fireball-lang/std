@@ -66,7 +66,7 @@ impl Response {
                 var end = find_crlf(res.buffer.slice(res.consumed, res.filled - res.consumed));
                 if (end < 0) break;
 
-                var line = StringView { ptr: &res.buffer.ptr[res.consumed], size: end as u32 };
+                var line = StringView { ptr: &res.buffer[res.consumed], size: end as u32 };
                 res.consumed += end as u64 + 2;
 
                 if (line.size == 0) {
@@ -135,7 +135,7 @@ impl Response {
 
     func read_byte(mut self) ?u8 {
         if (self.consumed < self.filled) {
-            var b = self.buffer.ptr[self.consumed];
+            var b = self.buffer[self.consumed];
             self.consumed += 1;
             return b;
         }
@@ -157,7 +157,7 @@ impl Response {
             var to_copy = leftover;
             if (to_copy > buffer.size) to_copy = buffer.size;
 
-            memcpy(buffer.ptr, &self.buffer.ptr[self.consumed], to_copy);
+            memcpy(buffer.ptr, &self.buffer[self.consumed], to_copy);
             self.consumed += to_copy;
             total += to_copy;
         }

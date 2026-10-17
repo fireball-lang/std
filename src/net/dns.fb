@@ -27,7 +27,7 @@ pub func resolve_domain(domain: StringView, buffer: mut [][4]u8) u32 {
     var count = 0u;
 
     while (entry != null && count < buffer.size) {
-        buffer.ptr[count++] = entry.addr.ip;
+        buffer[count++] = entry.addr.ip;
         entry = entry.next;
     }
 

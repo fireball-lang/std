@@ -25,7 +25,7 @@ impl MemoryReader : Reader {
         var n = buffer.size;
         if (self.pos + n > self.data.size) n = self.data.size - self.pos;
 
-        memcpy(buffer.ptr, &self.data.ptr[self.pos], n);
+        memcpy(buffer.ptr, &self.data[self.pos], n);
         self.pos += n;
 
         return n;

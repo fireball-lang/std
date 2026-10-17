@@ -448,15 +448,15 @@ pub enum MouseEvents {
 
 pub struct EventSourceOptions {
     /// Configures what kind of mouse events should the application receive.
-    mouse: MouseEvents,
+    pub mouse: MouseEvents,
 
     /// Disables special output processing for special characters.
     /// For example, the `\n` character will only move the cursor down but not to the begging of the line.
-    disable_output_processing: bool,
+    pub disable_output_processing: bool,
 
     /// Configures the timeout in milliseconds before responding with a `Key::Esc` event on ANSI-based backends.
     /// The reason is that the same value as an escape key is used to start multi-byte escape sequences.
-    ansi_esc_timeout_ms: u16,
+    pub ansi_esc_timeout_ms: u16,
 }
 
 impl EventSourceOptions {

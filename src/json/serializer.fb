@@ -239,7 +239,7 @@ impl[T] Slice[T] : Serialize {
         se.array_start();
 
         for (var i = 0u; i < self.size; i++) {
-            se.serialize(&self.ptr[i], typeof(T));
+            se.serialize(&self[i], typeof(T));
         }
 
         se.array_end();
@@ -251,7 +251,7 @@ impl[T] MutSlice[T] : Serialize {
         se.array_start();
 
         for (var i = 0u; i < self.size; i++) {
-            se.serialize(&self.ptr[i], typeof(T));
+            se.serialize(&self[i], typeof(T));
         }
 
         se.array_end();

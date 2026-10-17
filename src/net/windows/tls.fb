@@ -149,7 +149,7 @@ impl TlsSocket {
 
             var src = &self.dec_data[self.dec_offset] as *u8;
             for (var i = 0u; i < to_copy; i++) {
-                buffer.ptr[i] = src[i];
+                buffer[i] = src[i];
             }
 
             self.dec_len -= to_copy;
