@@ -113,6 +113,21 @@ impl Serializer {
             return;
         }
 
+        // Tuple
+        if (info.kind == TypeKind::Tuple) {
+            var fields = info.tuple_fields();
+
+            self.array_start();
+
+            for (var i = 0u; i < fields.size; i++) {
+                var field = fields[i];
+                self.serialize(&(ptr as *u8)[field.offset], field.type_info);
+            }
+
+            self.array_end();
+            return;
+        }
+
         // Reference
         if (info.kind == TypeKind::Reference) {
             var value = *(ptr as *&void);

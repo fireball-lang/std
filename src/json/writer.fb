@@ -95,7 +95,7 @@ impl Writer {
             self.item();
         }
 
-        format_u64(self.writer, value, 0);
+        format_u64(self.writer, value, 10);
     }
 
     pub func i64(mut self, value: i64) {
@@ -103,7 +103,7 @@ impl Writer {
             self.item();
         }
 
-        format_i64(self.writer, value, 0);
+        format_i64(self.writer, value, 10);
     }
 
     pub func f64(mut self, value: f64) {

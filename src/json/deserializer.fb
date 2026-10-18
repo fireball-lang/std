@@ -235,6 +235,28 @@ impl Deserializer {
             return true;
         }
 
+        // Tuple
+        if (info.kind == TypeKind::Tuple) {
+            self.array_start()?;
+
+            var fields = info.tuple_fields();
+            var i = 0u;
+
+            for (;;) {
+                var kind = self.peek()?.kind;
+                if (kind == TokenKind::EOF || kind == TokenKind::ArrayEnd) break;
+
+                if (i >= fields.size) return Option:[bool]::none();
+                var field = fields[i];
+
+                self.deserialize(&(ptr as mut* u8)[field.offset], field.type_info)?;
+                i++;
+            }
+
+            self.array_end()?;
+            return true;
+        }
+
         // Reference
         if (info.kind == TypeKind::Reference) {
             var ptr = ptr as mut* mut& void;
