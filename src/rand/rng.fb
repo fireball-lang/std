@@ -1,0 +1,48 @@
+mod std::rand;
+
+import std::sys;
+
+/// A source of random numbers.
+pub interface Rng {
+    /// Returns the next 64 random bits.
+    func next_u64(mut self) u64;
+
+    /// Fills `dst` with random bytes.
+    func fill(mut self, dst: mut []u8);
+}
+
+/// Returns 64 bits of entropy requested from the OS.
+#[cfg(target_os = "windows")]
+pub func entropy() ?u64 {
+    var num: u64;
+
+    if (sys::BCryptGenRandom(null, &num, 8, sys::BCryptFlags::UseSystemPreferredRng) != 0) {
+        return Option:[u64]::none();
+    }
+
+    return num;
+}
+
+/// Returns 64 bits of entropy requested from the OS.
+#[cfg(target_os = "linux")]
+pub func entropy() ?u64 {
+    var num: u64;
+
+    if (sys::getrandom(&num, 8, 0) != 8) {
+        return Option:[u64]::none();
+    }
+
+    return num;
+}
+
+/// Returns 64 bits of entropy requested from the OS.
+#[cfg(target_os = "macos")]
+pub func entropy() ?u64 {
+    var num: u64;
+
+    if (sys::getentropy(&num, 8) != 0) {
+        return Option:[u64]::none();
+    }
+
+    return num;
+}

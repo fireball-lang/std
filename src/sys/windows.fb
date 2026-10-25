@@ -327,6 +327,11 @@ impl EventFlags : BitAnd[EventFlags] {
     }
 }
 
+pub enum BCryptFlags : u32 {
+    UseEntropyInBuffer    = 0x00000001,
+    UseSystemPreferredRng = 0x00000002,
+}
+
 pub enum CodePage : u32 {
     UTF8 = 65001,
 }
@@ -768,6 +773,9 @@ pub func FreeCredentialsHandle(phCredential: *SecHandle) i32;
 
 #[extern]
 pub func FreeContextBuffer(pvContextBuffer: *void) i32;
+
+#[extern]
+pub func BCryptGenRandom(hAlgorithm: mut *void, pbBuffer: mut *void, cbBuffer: u32, dwFlags: BCryptFlags) i32;
 
 // Init
 

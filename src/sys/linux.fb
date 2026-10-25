@@ -501,7 +501,7 @@ pub func exit(code: i32) {
     syscall1u(60, u64(code));
 }
 
-pub func clock_gettime(clk_id: i32, tp: mut* TimeSpec) i32 {
+pub func clock_gettime(clk_id: i32, tp: mut *TimeSpec) i32 {
     return syscall2i(228, u64(clk_id), tp as u64) as i32;
 }
 
@@ -529,7 +529,7 @@ pub func listen(fd: i32, backlog: i32) i32 {
     return syscall2i(50, u64(fd), u64(backlog)) as i32;
 }
 
-pub func accept(fd: i32, addr: mut* SocketAddress, len: mut* u32) i32 {
+pub func accept(fd: i32, addr: mut *SocketAddress, len: mut *u32) i32 {
     return syscall3i(43, u64(fd), addr as u64, len as u64) as i32;
 }
 
@@ -537,8 +537,12 @@ pub func send(fd: i32, buf: *void, len: u64, flags: i32) i64 {
     return syscall6i(44, u64(fd), buf as u64, len, u64(flags), 0, 0);
 }
 
-pub func recv(fd: i32, buf: mut* void, len: u64, flags: i32) i64 {
+pub func recv(fd: i32, buf: mut *void, len: u64, flags: i32) i64 {
     return syscall6i(45, u64(fd), buf as u64, len, u64(flags), 0, 0);
+}
+
+pub func getrandom(buf: mut *void, size: u64, flags: u32) i64 {
+    return syscall3i(318, buf as u64, size, flags);
 }
 
 // LibC

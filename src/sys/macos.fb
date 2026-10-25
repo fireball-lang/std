@@ -556,6 +556,9 @@ pub func SSLClose(ctx: *SslCtx) i32;
 #[extern]
 pub func CFRelease(cf: *void);
 
+#[extern]
+pub func getentropy(buffer: mut *void, size: u64) i32;
+
 // Utils
 
 pub const AT_FDCWD: i32 = -2;
