@@ -130,7 +130,6 @@ impl Key {
         if (*self == Self::F12) return "F12";
 
         panic("invalid Key");
-        return "";
     }
 }
 
@@ -207,7 +206,6 @@ impl Action {
         if (*self == Self::Release) return "Release";
 
         panic("invalid Action");
-        return "";
     }
 }
 
@@ -230,7 +228,6 @@ impl Button {
         if (*self == Self::ScrollDown) return "ScrollDown";
 
         panic("invalid Button");
-        return "";
     }
 }
 

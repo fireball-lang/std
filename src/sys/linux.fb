@@ -497,8 +497,8 @@ pub func waitpid(pid: i32, status: mut *i32, options: i32) i32 {
     return syscall4i(61, u64(pid), status as u64, u64(options), 0) as i32;
 }
 
-pub func exit(code: i32) {
-    syscall1u(60, u64(code));
+pub func exit(code: i32) never {
+    syscall1n(60, u64(code));
 }
 
 pub func clock_gettime(clk_id: i32, tp: mut *TimeSpec) i32 {
@@ -581,6 +581,8 @@ func syscall0u(num: u64) u64;
 func syscall1i(num: u64, arg0: u64) i64;
 #[intrinsic(syscall)]
 func syscall1u(num: u64, arg0: u64) u64;
+#[intrinsic(syscall)]
+func syscall1n(num: u64, arg0: u64) never;
 
 #[intrinsic(syscall)]
 func syscall2i(num: u64, arg0: u64, arg1: u64) i64;

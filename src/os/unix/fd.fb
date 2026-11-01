@@ -87,12 +87,14 @@ pub func stat(path: *u8) ?FileInfo {
     if (result == -1) return Option:[FileInfo]::none();
 
     // Create FileInfo
-    var mode = stat.mode & 0x0000F000;
-    var kind = FileKind::Other;
+    var kind: FileKind;
 
-    if (mode == 0x00008000) kind = FileKind::File;
-    else if (mode == 0x00004000) kind = FileKind::Directory;
-    else if (mode == 0x0000A000) kind = FileKind::Symlink;
+    match (stat.mode & 0x0000F000) {
+        0x00008000 => kind = FileKind::File;
+        0x00004000 => kind = FileKind::Directory;
+        0x0000A000 => kind = FileKind::Symlink;
+        _ => kind = FileKind::Other;
+    }
 
     return FileInfo {
         kind: kind,

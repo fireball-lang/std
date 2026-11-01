@@ -99,27 +99,21 @@ impl DirIterator {
             // Get FileKind with fallback to `stat()`
             info.empty = true;
 
-            if (entry.type_ == 0) {
-                var info_opt = self.stat(name);
+            match (entry.type_) {
+                0 => {
+                    var info_opt = self.stat(name);
 
-                if (info_opt.is_some()) {
-                    info.empty = false;
-                    info.info = info_opt.unwrap();
+                    if (info_opt.is_some()) {
+                        info.empty = false;
+                        info.info = info_opt.unwrap();
 
-                    *kind = info.info.kind;
+                        *kind = info.info.kind;
+                    }
                 }
-            }
-            else if (entry.type_ == 8) {
-                *kind = FileKind::File;
-            }
-            else if (entry.type_ == 4) {
-                *kind = FileKind::Directory;
-            }
-            else if (entry.type_ == 10) {
-                *kind = FileKind::Symlink;
-            }
-            else {
-                *kind = FileKind::Other;
+                8 => *kind = FileKind::File;
+                4 => *kind = FileKind::Directory;
+                10 => *kind = FileKind::Symlink;
+                _ => *kind = FileKind::Other;
             }
 
             // Return

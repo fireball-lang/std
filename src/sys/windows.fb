@@ -687,7 +687,7 @@ pub func WaitForSingleObject(handle: Handle, ms: u32) u32;
 pub func GetExitCodeProcess(process: Handle, exit_code: mut *u32) i32;
 
 #[extern]
-pub func ExitProcess(code: u32);
+pub func ExitProcess(code: u32) never;
 
 #[extern]
 pub func QueryPerformanceCounter(performance_count: mut *u64) i32;

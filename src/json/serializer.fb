@@ -94,8 +94,6 @@ impl Serializer {
             else if (kind == PrimitiveKind::F32) self.f64(*(ptr as *f32));
             else if (kind == PrimitiveKind::F64) self.f64(*(ptr as *f64));
             else panic("Invalid primitive kind");
-
-            return;
         }
 
         // Array

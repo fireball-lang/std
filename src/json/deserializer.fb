@@ -208,7 +208,6 @@ impl Deserializer {
             }
 
             panic("Invalid primitive kind");
-            return Option:[bool]::none();
         }
 
         // Array
@@ -381,7 +380,6 @@ impl Deserializer {
 
         // Invalid
         panic("Failed to deserialize type");
-        return Option:[bool]::none();
     }
 }
 

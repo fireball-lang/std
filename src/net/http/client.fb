@@ -190,7 +190,6 @@ func connect(uri: Uri) ?HttpSocket {
 
     // Invalid
     panic("invalid URL scheme for HTTP request");
-    return Option:[HttpSocket]::none();
 }
 
 func write_line(socket: HttpSocket, method: Method, uri: Uri) {

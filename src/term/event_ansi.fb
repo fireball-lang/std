@@ -313,26 +313,28 @@ func parse_sgr_mouse_sequence(bytes: []u8, end_idx: u32, consumed: u32) AnsiResu
     }
 
     // 4. Handle Button Events (Press, Drag, Release, Scroll)
-    var button = Button::None;
+    var button: Button;
     var action = Action::Press;
 
     if (is_scroll) {
         // Scroll events always report as 'Pressed'
-        if (button_code == 0) button = Button::ScrollUp;
-        else if (button_code == 1) button = Button::ScrollDown;
+        match (button_code) {
+            0 => button = Button::ScrollUp;
+            1 => button = Button::ScrollDown;
+            _ => button = Button::None;
+        }
     } else {
         // Map Standard Buttons
-        if (button_code == 0) button = Button::Left;
-        else if (button_code == 1) button = Button::Middle;
-        else if (button_code == 2) button = Button::Right;
-        else if (button_code == 3) button = Button::None;
+        match (button_code) {
+            0 => button = Button::Left;
+            1 => button = Button::Middle;
+            2 => button = Button::Right;
+            _ => button = Button::None;
+        }
 
         // Map Action
-        if (!is_press) {
-            action = Action::Release;
-        } else if (is_motion_bit) {
-            action = Action::Drag;
-        }
+        if (!is_press) action = Action::Release;
+        else if (is_motion_bit) action = Action::Drag;
     }
 
     return AnsiResult {

@@ -145,13 +145,13 @@ impl Process {
 
 /// Exits the current process with the specified exit code.
 #[cfg(target_family = "windows")]
-pub func exit(code: u8) {
+pub func exit(code: u8) never {
     sys::ExitProcess(code);
 }
 
 /// Exits the current process with the specified exit code.
 #[cfg(target_family = "unix")]
-pub func exit(code: u8) {
+pub func exit(code: u8) never {
     sys::exit(code as i32);
 }
 

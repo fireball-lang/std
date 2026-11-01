@@ -475,7 +475,7 @@ pub func execve(file: *u8, argv: **u8, envp: **u8) i32;
 pub func waitpid(pid: i32, status: mut *i32, options: i32) i32;
 
 #[extern]
-pub func exit(code: i32);
+pub func exit(code: i32) never;
 
 #[extern]
 pub func mach_continuous_time() u64;
