@@ -135,18 +135,20 @@ impl Writer {
     }
 
     pub func token(mut self, token: Token) {
-        if (token.kind == TokenKind::ObjectStart) self.object_start();
-        else if (token.kind == TokenKind::ObjectEnd) self.object_end();
-        else if (token.kind == TokenKind::ArrayStart) self.array_start();
-        else if (token.kind == TokenKind::ArrayEnd) self.array_end();
-        else if (token.kind == TokenKind::Property) self.property(token.text);
-        else if (token.kind == TokenKind::String) self.string(token.text);
-        else {
-            if (self.is_in_array()) {
-                self.item();
-            }
+        match (token.kind) {
+            TokenKind::ObjectStart => self.object_start();
+            TokenKind::ObjectEnd => self.object_end();
+            TokenKind::ArrayStart => self.array_start();
+            TokenKind::ArrayEnd => self.array_end();
+            TokenKind::Property => self.property(token.text);
+            TokenKind::String => self.string(token.text);
+            _ => {
+                if (self.is_in_array()) {
+                    self.item();
+                }
 
-            self.writer.write(token.text);
+                self.writer.write(token.text);
+            }
         }
     }
 

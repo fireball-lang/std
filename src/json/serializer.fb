@@ -82,18 +82,20 @@ impl Serializer {
         if (info.kind == TypeKind::Primitive) {
             var kind = info.primitive_kind();
 
-            if (kind == PrimitiveKind::Bool) self.bool(*(ptr as *bool));
-            else if (kind == PrimitiveKind::U8) self.u64(*(ptr as *u8));
-            else if (kind == PrimitiveKind::U16) self.u64(*(ptr as *u16));
-            else if (kind == PrimitiveKind::U32) self.u64(*(ptr as *u32));
-            else if (kind == PrimitiveKind::U64) self.u64(*(ptr as *u64));
-            else if (kind == PrimitiveKind::I8) self.i64(*(ptr as *i8));
-            else if (kind == PrimitiveKind::I16) self.i64(*(ptr as *i16));
-            else if (kind == PrimitiveKind::I32) self.i64(*(ptr as *i32));
-            else if (kind == PrimitiveKind::I64) self.i64(*(ptr as *i64));
-            else if (kind == PrimitiveKind::F32) self.f64(*(ptr as *f32));
-            else if (kind == PrimitiveKind::F64) self.f64(*(ptr as *f64));
-            else panic("Invalid primitive kind");
+            match (kind) {
+                PrimitiveKind::Bool => self.bool(*(ptr as *bool));
+                PrimitiveKind::U8 => self.u64(*(ptr as *u8));
+                PrimitiveKind::U16 => self.u64(*(ptr as *u16));
+                PrimitiveKind::U32 => self.u64(*(ptr as *u32));
+                PrimitiveKind::U64 => self.u64(*(ptr as *u64));
+                PrimitiveKind::I8 => self.i64(*(ptr as *i8));
+                PrimitiveKind::I16 => self.i64(*(ptr as *i16));
+                PrimitiveKind::I32 => self.i64(*(ptr as *i32));
+                PrimitiveKind::I64 => self.i64(*(ptr as *i64));
+                PrimitiveKind::F32 => self.f64(*(ptr as *f32));
+                PrimitiveKind::F64 => self.f64(*(ptr as *f64));
+                _ => panic("Invalid primitive kind");
+            }
         }
 
         // Array

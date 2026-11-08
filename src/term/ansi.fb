@@ -36,11 +36,13 @@ pub enum CursorOffset {
 
 /// Writes an ANSI sequence to the `Writer` that clears the screen starting from the cursor up to the provied offset.
 pub func clear_from_cursor(w: mut Writer, to: CursorOffset) {
-    if (to == CursorOffset::EndOfScreen) w.write("\x1b[0J");
-    else if (to == CursorOffset::BeginningOfScreen) w.write("\x1b[1J");
-    else if (to == CursorOffset::EndOfLine) w.write("\x1b[0K");
-    else if (to == CursorOffset::BeginningOfLine) w.write("\x1b[1K");
-    else panic("invalid CursorOffset");
+    match (to) {
+        CursorOffset::EndOfScreen => w.write("\x1b[0J");
+        CursorOffset::BeginningOfScreen => w.write("\x1b[1J");
+        CursorOffset::EndOfLine => w.write("\x1b[0K");
+        CursorOffset::BeginningOfLine => w.write("\x1b[1K");
+        _ => panic("invalid CursorOffset");
+    }
 }
 
 /// Writes and ANSI sequence to the `Writer` that clears the entire line the cursor is on.

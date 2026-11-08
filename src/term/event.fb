@@ -401,31 +401,34 @@ impl Event {
 
 impl Event : Display {
     pub func display(self, fmt: Formatter) {
-        if (self.kind == EventKind::Key) {
-            fmt.str("Key(");
-            self.data.key.display(fmt);
-            fmt.str(")");
-        }
-        else if (self.kind == EventKind::Button) {
-            fmt.str("Button(");
-            self.data.button.display(fmt);
-            fmt.str(")");
-        }
-        else if (self.kind == EventKind::Motion) {
-            fmt.str("Motion(");
-            self.data.motion.display(fmt);
-            fmt.str(")");
-        }
-        else if (self.kind == EventKind::Resize) {
-            fmt.str("Resize(");
-            self.data.size.display(fmt);
-            fmt.str(")");
-        }
-        else if (self.kind == EventKind::FocusGained) {
-            fmt.str("FocusGained");
-        }
-        else if (self.kind == EventKind::FocusLost) {
-            fmt.str("FocusLost");
+        match (self.kind) {
+            EventKind::Key => {
+                fmt.str("Key(");
+                self.data.key.display(fmt);
+                fmt.str(")");
+            }
+            EventKind::Button => {
+                fmt.str("Button(");
+                self.data.button.display(fmt);
+                fmt.str(")");
+            }
+            EventKind::Motion => {
+                fmt.str("Motion(");
+                self.data.motion.display(fmt);
+                fmt.str(")");
+            }
+            EventKind::Resize => {
+                fmt.str("Resize(");
+                self.data.size.display(fmt);
+                fmt.str(")");
+            }
+            EventKind::FocusGained => {
+                fmt.str("FocusGained");
+            }
+            EventKind::FocusLost => {
+                fmt.str("FocusLost");
+            }
+            _ => panic("invalid EventKind");
         }
     }
 }
