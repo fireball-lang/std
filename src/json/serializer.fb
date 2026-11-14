@@ -167,7 +167,7 @@ impl Serializer {
         // Enum
         if (info.kind == TypeKind::Enum) {
             var kind = info.enum_underlying().primitive_kind();
-            var cases = info.cases();
+            var cases = info.enum_cases();
 
             for (var i = 0u; i < cases.size; i++) {
                 var case = cases[i];
